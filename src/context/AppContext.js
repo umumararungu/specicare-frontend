@@ -8,6 +8,9 @@ import React, {
 } from "react";
 import axios from "axios";
 
+axios.defaults.withCredentials = true;
+axios.defaults.headers.common["Content-Type"] = "application/json";
+
 const AppContext = createContext();
 
 // Helper: convert snake_case keys to camelCase recursively for objects returned by backend
