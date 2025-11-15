@@ -50,7 +50,7 @@ export const AppProvider = ({ children }) => {
   const [hospitals, setHospitals] = useState([]);
   const [currentResultDraft, setCurrentResultDraft] = useState(null);
 
-  const API_BASE = "http://localhost:5000/api";
+  const API_BASE = "https://specicare-backend-production.up.railway.app/";
 
   // Check if user is admin
   const isAdmin = currentUser?.role === "admin";
