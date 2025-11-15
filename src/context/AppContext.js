@@ -50,7 +50,9 @@ export const AppProvider = ({ children }) => {
   const [hospitals, setHospitals] = useState([]);
   const [currentResultDraft, setCurrentResultDraft] = useState(null);
 
-  const API_BASE = process.env.REACT_APP_API_URL;
+  // Normalize API base: remove any trailing slashes so concatenation below
+  // won't produce accidental double-slashes which some servers treat strictly
+  const API_BASE = (process.env.REACT_APP_API_URL || "").replace(/\/+$/, "");
 
   // Check if user is admin
   const isAdmin = currentUser?.role === "admin";
