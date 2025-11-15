@@ -52,7 +52,8 @@ export const AppProvider = ({ children }) => {
 
   // Normalize API base: remove any trailing slashes so concatenation below
   // won't produce accidental double-slashes which some servers treat strictly
-  const API_BASE = (process.env.REACT_APP_API_URL || "").replace(/\/+$/, "");
+const API_BASE =
+  `${(process.env.REACT_APP_API_URL || "").replace(/\/+$/, "")}/api`;
 
   // Check if user is admin
   const isAdmin = currentUser?.role === "admin";
