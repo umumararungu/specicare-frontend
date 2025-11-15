@@ -97,6 +97,19 @@ export const AppProvider = ({ children }) => {
     }
   }, [API_BASE]); // Only depend on API_BASE since it's a constant
 
+  // Fetch user's recent notifications (stable reference)
+  // Wrapped with useCallback so it can be safely added to other hook dependency arrays
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/notifications/my`, { withCredentials: true });
+      if (res.data && res.data.success) {
+        setNotifications(camelizeObject(res.data.notifications || []));
+      }
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+    }
+  }, [API_BASE]);
+
   // Enhanced initializeData for admin
   const initializeData = useCallback(async () => {
     try {
@@ -168,7 +181,7 @@ export const AppProvider = ({ children }) => {
       setTestResults([]);
       setActiveSection("login");
     }
-  }, [API_BASE, fetchAdminData]); // Include fetchAdminData in dependencies
+  }, [API_BASE, fetchAdminData, fetchNotifications]); // Include fetchAdminData and fetchNotifications in dependencies
 
   useEffect(() => {
     initializeData();
@@ -593,17 +606,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Fetch user's recent notifications
-  const fetchNotifications = async () => {
-    try {
-      const res = await axios.get(`${API_BASE}/notifications/my`, { withCredentials: true });
-      if (res.data && res.data.success) {
-        setNotifications(camelizeObject(res.data.notifications || []));
-      }
-    } catch (err) {
-      console.error('Error fetching notifications:', err);
-    }
-  };
+  
 
   const createHospital = async (hospitalData) => {
     try {
