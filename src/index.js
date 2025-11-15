@@ -11,7 +11,14 @@ root.render(
   </React.StrictMode>
 );
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
+
+try {
+  const apiUrl = (process.env.REACT_APP_API_URL || '').replace(/\/+$/, '');
+  if (apiUrl) axios.defaults.baseURL = apiUrl;
+  axios.defaults.withCredentials = true;
+} catch (e) {
+
+}
+
+
 reportWebVitals();
