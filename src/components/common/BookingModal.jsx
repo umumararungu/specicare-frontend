@@ -78,7 +78,6 @@ const BookingModal = () => {
           date: dateIso,
           duration: currentTest.duration || 45,
         },
-        withCredentials: true,
       });
       if (res.data && res.data.success) {
         setAvailableSlots(res.data.slots || []);

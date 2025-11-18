@@ -16,7 +16,10 @@ root.render(
 try {
   const apiUrl = (process.env.REACT_APP_API_URL || '').replace(/\/+$/, '');
   if (apiUrl) axios.defaults.baseURL = apiUrl;
-  axios.defaults.withCredentials = true;
+  // Do NOT send cookies or credentials by default. This disables cookie-based
+  // session behavior on the frontend so login/register flows do not depend on
+  // server-set cookies. Backend must support token-based auth if needed.
+  axios.defaults.withCredentials = false;
 } catch (e) {
 
 }

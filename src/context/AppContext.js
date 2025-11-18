@@ -8,7 +8,8 @@ import React, {
 } from "react";
 import axios from "axios";
 
-axios.defaults.withCredentials = true;
+// Do not send cookies/credentials by default from the frontend.
+axios.defaults.withCredentials = false;
 axios.defaults.headers.common["Content-Type"] = "application/json";
 
 const AppContext = createContext();
@@ -89,10 +90,10 @@ const API_BASE =
     try {
       const [statsRes, usersRes, appointmentsRes] = await Promise.all([
         axios.get(`${API_BASE}/admin/dashboard/stats`, {
-          withCredentials: true,
+          withCredentials: false,
         }),
-        axios.get(`${API_BASE}/admin/users`, { withCredentials: true }),
-        axios.get(`${API_BASE}/admin/appointments`, { withCredentials: true }),
+        axios.get(`${API_BASE}/admin/users`, { withCredentials: false }),
+        axios.get(`${API_BASE}/admin/appointments`, { withCredentials: false }),
       ]);
   setAdminStats(statsRes.data.stats);
   setAllUsers(camelizeObject(usersRes.data.users || []));
@@ -107,7 +108,7 @@ const API_BASE =
   // Wrapped with useCallback so it can be safely added to other hook dependency arrays
   const fetchNotifications = useCallback(async () => {
     try {
-      const res = await axios.get(`${API_BASE}/notifications/my`, { withCredentials: true });
+      const res = await axios.get(`${API_BASE}/notifications/my`, { withCredentials: false });
       if (res.data && res.data.success) {
         setNotifications(camelizeObject(res.data.notifications || []));
       }
@@ -123,7 +124,7 @@ const API_BASE =
 
       // Fetch logged-in user
       const userRes = await axios.get(`${API_BASE}/users/me`, {
-        withCredentials: true,
+        withCredentials: false,
       });
       const camelUser = camelizeObject(userRes.data.user);
       setCurrentUser(camelUser);
@@ -140,12 +141,12 @@ const API_BASE =
   setMedicalTests(camelizeObject(testsRes.data || []));
 
       const hospitalsRes = await axios.get(`${API_BASE}/hospitals`, {
-        withCredentials: true,
+        withCredentials: false,
       });
   setHospitals(camelizeObject(hospitalsRes.data.hospitals || []));
 
       const apptsRes = await axios.get(`${API_BASE}/appointments/my`, {
-        withCredentials: true,
+        withCredentials: false,
       });
   setAppointments(camelizeObject(apptsRes.data || []));
       console.log("appointments: ", apptsRes.data);
@@ -155,7 +156,7 @@ const API_BASE =
         await fetchAdminData();
         // Fetch notifications for admin as well so admin sees server-side events immediately
         try {
-          const notifRes = await axios.get(`${API_BASE}/notifications/my`, { withCredentials: true });
+          const notifRes = await axios.get(`${API_BASE}/notifications/my`, { withCredentials: false });
           if (notifRes.data && notifRes.data.success) {
             setNotifications(camelizeObject(notifRes.data.notifications || []));
           }
@@ -165,12 +166,12 @@ const API_BASE =
       } else {
         // Regular user data
         const apptsRes = await axios.get(`${API_BASE}/appointments/my`, {
-          withCredentials: true,
+          withCredentials: false,
         });
         setAppointments(camelizeObject(apptsRes.data || []));
 
         const resultsRes = await axios.get(`${API_BASE}/test-results/my`, {
-          withCredentials: true,
+          withCredentials: false,
         });
         setTestResults(camelizeObject(resultsRes.data || []));
         // Fetch recent notifications for user
@@ -231,7 +232,7 @@ const API_BASE =
       const res = await axios.post(
         `${API_BASE}/users/login`,
         { email, password },
-        { withCredentials: true }
+        { withCredentials: false }
       );
 
       if (res.data.success) {
@@ -242,8 +243,9 @@ const API_BASE =
         showNotification(res.data.message, "success");
         clearErrors();
 
-        // Reinitialize data after login
-        await initializeData();
+        // Do not reinitialize data by calling server-dependent endpoints that
+        // rely on cookies/tokens. Instead rely on the returned user object so
+        // login/register can succeed without cookie-based sessions.
 
         setIsLoading(false);
         return true;
@@ -290,7 +292,7 @@ const API_BASE =
       await axios.post(
         `${API_BASE}/users/logout`,
         {},
-        { withCredentials: true }
+        { withCredentials: false }
       );
       setCurrentUser(null);
       setCurrentTest(null);
@@ -312,7 +314,7 @@ const API_BASE =
       setIsLoading(true);
       clearErrors();
 
-  const res = await axios.post(`${API_BASE}/users/register`, userData, { withCredentials: true });
+  const res = await axios.post(`${API_BASE}/users/register`, userData, { withCredentials: false });
 
       if (res.data.success) {
         const camelUser = camelizeObject(res.data.user);
@@ -321,8 +323,9 @@ const API_BASE =
         showNotification(res.data.message, "success");
         clearErrors();
 
-        // Reinitialize data after registration
-        await initializeData();
+        // Do not reinitialize data after registration for the same reason as
+        // above. We keep the current user from the response and avoid extra
+        // server calls that require cookies.
 
         setIsLoading(false);
         return true;
@@ -422,13 +425,13 @@ const API_BASE =
           ...bookingData,
           patientId: currentUser.id,
         },
-        { withCredentials: true }
+        { withCredentials: false }
       );
       // Capture created appointment (backend returns created appointment)
       const createdAppointment = res?.data ? camelizeObject(res.data) : null;
       // Refresh the user's appointments from the server to ensure consistent state
       try {
-        const apptsRes = await axios.get(`${API_BASE}/appointments/my`, { withCredentials: true });
+        const apptsRes = await axios.get(`${API_BASE}/appointments/my`, { withCredentials: false });
         setAppointments(camelizeObject(apptsRes.data || []));
       } catch (err) {
         // Fallback: append the returned appointment if fetching fresh list fails
@@ -463,7 +466,7 @@ const API_BASE =
       const res = await axios.put(
         `${API_BASE}/admin/appointments/${appointmentId}/status`,
         { status },
-        { withCredentials: true }
+        { withCredentials: false }
       );
 
       if (res.data.success) {
@@ -494,9 +497,9 @@ const API_BASE =
       let res;
       // If payload is FormData (multipart), let the browser set headers
       if (typeof FormData !== 'undefined' && payload instanceof FormData) {
-        res = await axios.post(`${API_BASE}/test-results`, payload, { withCredentials: true });
+        res = await axios.post(`${API_BASE}/test-results`, payload, { withCredentials: false });
       } else {
-        res = await axios.post(`${API_BASE}/test-results`, payload, { withCredentials: true });
+        res = await axios.post(`${API_BASE}/test-results`, payload, { withCredentials: false });
       }
 
       if (res.data && res.data.success) {
@@ -515,7 +518,7 @@ const API_BASE =
   const createMedicalTest = async (testData) => {
     try {
       const res = await axios.post(`${API_BASE}/admin/medical-test`, testData, {
-        withCredentials: true,
+        withCredentials: false,
       });
 
       if (res.data.success) {
@@ -537,7 +540,7 @@ const API_BASE =
   const updateMedicalTest = async (testId, updates) => {
     try {
       const res = await axios.put(`${API_BASE}/admin/medical-test/${testId}`, updates, {
-        withCredentials: true,
+        withCredentials: false,
       });
 
       if (res.data && res.data.success) {
@@ -556,7 +559,7 @@ const API_BASE =
     try {
       const res = await axios.delete(
         `${API_BASE}/admin/medical-test/${testId}`,
-        { withCredentials: true }
+        { withCredentials: false }
       );
 
       if (res.data.success) {
@@ -578,7 +581,7 @@ const API_BASE =
   const deleteUser = async (userId) => {
     try {
       const res = await axios.delete(`${API_BASE}/admin/users/${userId}`, {
-        withCredentials: true,
+        withCredentials: false,
       });
 
       if (res.data.success) {
@@ -603,7 +606,7 @@ const API_BASE =
   const fetchHospitals = async () => {
     try {
       const res = await axios.get(`${API_BASE}/hospitals`, {
-        withCredentials: true,
+        withCredentials: false,
       });
       setHospitals(camelizeObject(res.data.hospitals || []));
     } catch (error) {
@@ -619,7 +622,7 @@ const API_BASE =
       const res = await axios.post(
         `${API_BASE}/admin/hospitals`,
         hospitalData,
-        { withCredentials: true }
+        { withCredentials: false }
       );
 
       if (res.data.success) {
@@ -645,7 +648,7 @@ const API_BASE =
       const res = await axios.put(
         `${API_BASE}/admin/hospitals/${hospitalId}`,
         updates,
-        { withCredentials: true }
+        { withCredentials: false }
       );
 
       if (res.data.success) {
@@ -672,7 +675,7 @@ const API_BASE =
     try {
       const res = await axios.delete(
         `${API_BASE}/admin/hospitals/${hospitalId}`,
-        { withCredentials: true }
+        { withCredentials: false }
       );
 
       if (res.data.success) {
