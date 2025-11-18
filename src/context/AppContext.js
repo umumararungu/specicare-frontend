@@ -5,8 +5,10 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import axios from "axios";
+import { useSocket } from "../hooks/useSocket";
 
 // Do not send cookies/credentials by default from the frontend.
 axios.defaults.withCredentials = false;
@@ -58,6 +60,10 @@ export const AppProvider = ({ children }) => {
   // won't produce accidental double-slashes which some servers treat strictly
 const API_BASE =
   `${(process.env.REACT_APP_API_URL || "").replace(/\/+$/, "")}/api`;
+
+  // Socket server base (exclude trailing slashes). Socket.IO server typically
+  // sits at the backend origin (not under /api), so use the raw REACT_APP_API_URL.
+  const SOCKET_URL = (process.env.REACT_APP_API_URL || "").replace(/\/+$/, "");
 
   // Check if user is admin
   const isAdmin = currentUser?.role === "admin";
@@ -116,6 +122,8 @@ const API_BASE =
       console.error('Error fetching notifications:', err);
     }
   }, [API_BASE]);
+
+  // Notifications are received via Socket.IO (see `useSocket` below).
 
   // Enhanced initializeData for admin
   const initializeData = useCallback(async () => {
@@ -193,6 +201,26 @@ const API_BASE =
   useEffect(() => {
     initializeData();
   }, [initializeData]);
+
+  // When a user with a token is set, configure axios Authorization header
+  // and run initializeData once to populate user-specific data. We guard
+  // with a ref so we don't repeatedly reinitialize on subsequent token
+  // updates within the same session.
+  const _authInitialized = useRef(false);
+  useEffect(() => {
+    if (currentUser && currentUser.token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${currentUser.token}`;
+      if (!_authInitialized.current) {
+        // Populate all data that depends on authenticated user
+        initializeData();
+        _authInitialized.current = true;
+      }
+    } else {
+      // Remove Authorization header when no user
+      delete axios.defaults.headers.common['Authorization'];
+      _authInitialized.current = false;
+    }
+  }, [currentUser, initializeData]);
 
   // If the user navigated to a password reset URL like /reset-password?token=..., switch to reset section
   useEffect(() => {
@@ -702,6 +730,40 @@ const API_BASE =
       await fetchAdminData();
     }
   };
+
+  // Real-time socket connection: connect when a user is logged in. We listen
+  // for `notification` and `appointment:update` events and update local state.
+  useSocket(
+    SOCKET_URL,
+    // opts: pass auth token if available; backend can validate
+    { auth: { token: currentUser?.token }, transports: ['websocket'] },
+    {
+      notification: (payload) => {
+        try {
+          const p = camelizeObject(payload);
+          setNotifications((prev) => [p, ...(prev || [])]);
+        } catch (e) {
+          console.error('Socket notification handler error', e);
+        }
+      },
+      'appointment:update': (payload) => {
+        try {
+          // If admin, refresh admin data; otherwise refresh user appointments
+          if (currentUser?.role === 'admin') {
+            refreshAdminData();
+          } else if (currentUser) {
+            axios.get(`${API_BASE}/appointments/my`, { withCredentials: false })
+              .then((res) => setAppointments(camelizeObject(res.data || [])))
+              .catch((err) => console.debug('Could not refresh appointments from socket event', err && err.message));
+          }
+        } catch (e) {
+          console.error('Socket appointment:update handler error', e);
+        }
+      },
+    },
+    // enabled: only connect if there's a logged-in user
+    !!currentUser
+  );
 
   // -------------------------------
   // Values exposed to components

@@ -23,6 +23,8 @@ const AdminSection = () => {
     updateMedicalTest,
     updateHospital,
     notifications,
+    fetchHospitals,
+    refreshAdminData,
   } = useApp();
   const [activeTab, setActiveTab] = useState("overview");
   const [adminActivities, setAdminActivities] = useState([]);
@@ -47,6 +49,57 @@ const AdminSection = () => {
 
     setAdminActivities(storedActivities);
   }, []);
+
+  // If hospitals weren't loaded during app init (e.g. CORS or network error),
+  // fetch them when admin opens the hospitals tab or when component mounts.
+  useEffect(() => {
+    let mounted = true;
+    const ensureHospitals = async () => {
+      try {
+        if (mounted && (!hospitals || hospitals.length === 0)) {
+          await fetchHospitals();
+        }
+      } catch (e) {
+        console.error('Could not load hospitals for admin view', e);
+        showNotification('Failed to load hospitals', 'error');
+      }
+    };
+
+    // Fetch immediately if the hospitals tab is active, otherwise still ensure
+    // we have hospitals once on mount so the select lists work.
+    if (activeTab === 'hospitals') ensureHospitals();
+    else ensureHospitals();
+
+    return () => { mounted = false; };
+  }, [activeTab, hospitals, fetchHospitals, showNotification]);
+
+  // Ensure admin-specific data (users, appointments, tests) is loaded when
+  // the admin views the relevant tabs. This helps when initial app
+  // initialization failed or ran before auth headers were set.
+  useEffect(() => {
+    let mounted = true;
+    const ensureAdminData = async () => {
+      try {
+        if (!mounted) return;
+        if (currentUser && currentUser.role === 'admin') {
+          // If any of the primary admin arrays are empty, refresh admin data
+          if ((allUsers || []).length === 0 || (allAppointments || []).length === 0 || (medicalTests || []).length === 0) {
+            await refreshAdminData();
+          }
+        }
+      } catch (e) {
+        console.error('Could not load admin data', e);
+        showNotification('Failed to load admin data', 'error');
+      }
+    };
+
+    // Trigger when admin opens admin dashboard or switches tabs
+    if (activeTab === 'overview' || activeTab === 'users' || activeTab === 'bookings' || activeTab === 'tests') {
+      ensureAdminData();
+    }
+
+    return () => { mounted = false; };
+  }, [activeTab, currentUser, allUsers, allAppointments, medicalTests, refreshAdminData, showNotification]);
 
   // Admin stats
   const totalUsers = allUsers.length;
