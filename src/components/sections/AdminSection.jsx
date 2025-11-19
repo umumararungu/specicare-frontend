@@ -24,7 +24,7 @@ const AdminSection = () => {
     updateHospital,
     notifications,
     fetchHospitals,
-    refreshAdminData,
+    fetchAdminData,
   } = useApp();
   const [activeTab, setActiveTab] = useState("overview");
   const [adminActivities, setAdminActivities] = useState([]);
@@ -84,7 +84,7 @@ const AdminSection = () => {
         if (currentUser && currentUser.role === 'admin') {
           // If any of the primary admin arrays are empty, refresh admin data
           if ((allUsers || []).length === 0 || (allAppointments || []).length === 0 || (medicalTests || []).length === 0) {
-            await refreshAdminData();
+            await fetchAdminData();
           }
         }
       } catch (e) {
@@ -99,7 +99,7 @@ const AdminSection = () => {
     }
 
     return () => { mounted = false; };
-  }, [activeTab, currentUser, allUsers, allAppointments, medicalTests, refreshAdminData, showNotification]);
+  }, [activeTab, currentUser, allUsers, allAppointments, medicalTests, fetchAdminData, showNotification]);
 
   // Admin stats
   const totalUsers = allUsers.length;
