@@ -73,12 +73,18 @@ export const AppProvider = ({ children }) => {
 
   const clearErrors = useCallback(() => setErrors([]), []);
 
-  const showNotification = useCallback((message, type = "info", duration = 5000) => {
-    setNotification({ message, type });
-    if (duration > 0) {
-      setTimeout(() => setNotification(null), duration);
-    }
-  }, []);
+  // const showNotification = useCallback((message, type = "info", duration = 5000) => {
+  //   setNotification({ message, type });
+  //   if (duration > 0) {
+  //     setTimeout(() => setNotification(null), duration);
+  //   }
+  // }, []);
+
+  // Notification System
+const showNotification = useCallback((message, type = "info", duration = 5000) => {
+  setNotification({ message, type });
+  setTimeout(() => setNotification(null), duration);
+}, []);
 
   const showErrors = useCallback((errorMessages, type = "error") => {
     if (Array.isArray(errorMessages)) {
