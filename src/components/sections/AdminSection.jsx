@@ -594,7 +594,12 @@ const AdminSection = () => {
                 <p>
                   <strong>Hospital:</strong>{" "}
                   {
-                    ((hospitals || []).find((hospital) => hospital.id === (test.hospitalId ?? test.hospital_id)) || {}).name || 'N/A'
+                    // Compare as strings to avoid type mismatch between id types
+                    ((hospitals || []).find((hospital) => {
+                      const testHospitalId = (test.hospitalId ?? test.hospital_id);
+                      if (testHospitalId == null) return false;
+                      return String(hospital?.id) === String(testHospitalId);
+                    }) || {}).name || 'N/A'
                   }
                 </p>
                 <p>
