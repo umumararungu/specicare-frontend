@@ -433,12 +433,17 @@ export const AppProvider = ({ children }) => {
     async (payload) => {
       try {
         const res = await axios.post(`${API_BASE}/admin/medical-test`, payload);
-        const created = camelizeObject(res.data);
+        // Normalize response shapes: some backends return { test }, others return the created object directly
+        const raw = res.data?.test ?? res.data?.data ?? res.data ?? null;
+        const created = camelizeObject(raw);
         setMedicalTests((prev) => [created, ...(prev || [])]);
         showNotification(res.data?.message || "Medical test created", "success");
         return created;
       } catch (err) {
         console.error("createMedicalTest error", err);
+        // Log backend response for debugging
+        // eslint-disable-next-line no-console
+        console.debug('createMedicalTest response error:', err?.response?.data || err?.message || err);
         showErrors(err.response?.data?.message || "Error creating test");
         throw err;
       }
@@ -476,19 +481,22 @@ export const AppProvider = ({ children }) => {
         throw err;
       }
     },
-    [API_BASE, showErrors]
+    [API_BASE, showErrors, showNotification]
   );
 
   const createHospital = useCallback(
     async (payload) => {
       try {
         const res = await axios.post(`${API_BASE}/admin/hospitals`, payload);
-        const created = camelizeObject(res.data);
+        const raw = res.data?.hospital ?? res.data?.data ?? res.data ?? null;
+        const created = camelizeObject(raw);
         setHospitals((prev) => [created, ...(prev || [])]);
-        showNotification("Hospital added successfully", "success");
+        showNotification(res.data?.message || "Hospital added successfully", "success");
         return created;
       } catch (err) {
         console.error("createHospital error", err);
+        // eslint-disable-next-line no-console
+        console.debug('createHospital response error:', err?.response?.data || err?.message || err);
         showErrors(err.response?.data?.message || "Error creating hospital");
         throw err;
       }
@@ -561,7 +569,7 @@ export const AppProvider = ({ children }) => {
         throw err;
       }
     },
-    [API_BASE, showErrors]
+    [API_BASE, showErrors, showNotification]
   );
 
   const deleteUser = useCallback(
