@@ -37,15 +37,15 @@ export default function AddHospitalModal({ isOpen, onClose, onSubmit, edit }) {
         street: edit.street || "",
         latitude: edit.latitude ?? "",
         longitude: edit.longitude ?? "",
-        operating_hours: edit.operating_hours ? JSON.stringify(edit.operating_hours) : "",
-        facilities: edit.facilities ? JSON.stringify(edit.facilities) : "",
-        insurance_providers: edit.insurance_providers ? JSON.stringify(edit.insurance_providers) : "",
+        operating_hours: edit.operating_hours ? JSON.stringify(edit.operating_hours, null, 2) : "",
+        facilities: edit.facilities ? JSON.stringify(edit.facilities, null, 2) : "",
+        insurance_providers: edit.insurance_providers ? JSON.stringify(edit.insurance_providers, null, 2) : "",
       });
     }
   }, [edit]);
+  
   const { createHospital, updateHospital, showNotification, showErrors } = useApp();
 
-  // manage modal open/close lifecycle (body class, escape, outside click)
   useEffect(() => {
     if (!isOpen) return;
 
@@ -80,14 +80,67 @@ export default function AddHospitalModal({ isOpen, onClose, onSubmit, edit }) {
     setForm((p) => ({ ...p, [name]: value }));
   };
 
+  // Helper function to safely parse JSON with forgiving fallbacks
+  const safeJsonParse = (value, fieldName) => {
+    if (!value || value.trim() === "") return null;
+
+    const trimmed = value.trim();
+
+    // If it looks like JSON, try parsing directly
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        return JSON.parse(trimmed);
+      } catch (error) {
+        // fallthrough to forgiving parsing
+        console.warn(`JSON.parse failed for ${fieldName}:`, error);
+      }
+    }
+
+    // Fallbacks: allow simple comma/newline-separated lists for array-like fields
+    const fname = (fieldName || "").toLowerCase();
+    if (fname.includes("facility") || fname.includes("insurance")) {
+      // split on newlines or commas and return array
+      const parts = trimmed
+        .split(/\r?\n|,/) // split by newline or comma
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (parts.length === 0) return null;
+      return parts;
+    }
+
+    // operating_hours expected to be an object; try parse simple key:value pairs
+    if (fname.includes("operating")) {
+      // try parsing pairs like "monday:8:00-17:00, tuesday:8:00-17:00" or newline separated
+      const obj = {};
+      const pairs = trimmed.split(/\r?\n|,/).map((p) => p.trim()).filter(Boolean);
+      for (const p of pairs) {
+        const sep = p.includes(":") ? ":" : p.includes("=") ? "=" : null;
+        if (!sep) {
+          // cannot parse this pair, skip
+          continue;
+        }
+        const idx = p.indexOf(sep);
+        const key = p.substring(0, idx).trim();
+        const val = p.substring(idx + 1).trim();
+        if (key) obj[key] = val;
+      }
+      // if we parsed at least one key, return it
+      if (Object.keys(obj).length > 0) return obj;
+    }
+
+    // As a last resort, try to return the raw trimmed string (caller can accept it)
+    return trimmed;
+  };
+
   const handleSubmit = async () => {
-    const cleaned = {
-      ...form,
-      operating_hours: form.operating_hours ? JSON.parse(form.operating_hours) : null,
-      facilities: form.facilities ? JSON.parse(form.facilities) : null,
-      insurance_providers: form.insurance_providers ? JSON.parse(form.insurance_providers) : null,
-    };
     try {
+      const cleaned = {
+        ...form,
+        operating_hours: safeJsonParse(form.operating_hours, "Operating Hours"),
+        facilities: safeJsonParse(form.facilities, "Facilities"),
+        insurance_providers: safeJsonParse(form.insurance_providers, "Insurance Providers"),
+      };
+
       let created = null;
       if (edit && edit.id) {
         created = await updateHospital(edit.id, cleaned);
@@ -100,7 +153,7 @@ export default function AddHospitalModal({ isOpen, onClose, onSubmit, edit }) {
       onClose();
     } catch (err) {
       console.error("AddHospitalModal submit error", err);
-      showErrors(err.response?.data?.message || "Failed to save hospital");
+      showErrors(err.response?.data?.message || err.message || "Failed to save hospital");
     }
   };
 
@@ -138,23 +191,26 @@ export default function AddHospitalModal({ isOpen, onClose, onSubmit, edit }) {
 
         <textarea
           name="operating_hours"
-          placeholder="Operating Hours (JSON)"
+          placeholder='Operating Hours (JSON) - e.g., {"monday": "8:00-17:00"}'
           value={form.operating_hours}
           onChange={handleChange}
+          rows={3}
         />
 
         <textarea
           name="facilities"
-          placeholder="Facilities (JSON)"
+          placeholder='Facilities (JSON) - e.g., ["Emergency Room", "ICU", "Pharmacy"]'
           value={form.facilities}
           onChange={handleChange}
+          rows={3}
         />
 
         <textarea
           name="insurance_providers"
-          placeholder="Insurance Providers (JSON)"
+          placeholder='Insurance Providers (JSON) - e.g., ["RAMA", "MMI", "RSSB"]'
           value={form.insurance_providers}
           onChange={handleChange}
+          rows={3}
         />
 
         <div className="modal-actions">

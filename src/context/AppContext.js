@@ -454,8 +454,8 @@ useSocket(
         showNotification(res.data?.message || "Medical test created", "success");
         return created;
       } catch (err) {
-        console.error("createMedicalTest error", err);
-        showErrors(err.response?.data?.message || "Error creating test");
+        console.error("createMedicalTest error", err, err.response?.data);
+        showErrors(err.response?.data?.message || err.response?.data || "Error creating test");
         throw err;
       }
     },
@@ -471,8 +471,8 @@ useSocket(
         showNotification(res.data?.message || "Medical test updated", "success");
         return updated;
       } catch (err) {
-        console.error("updateMedicalTest error", err);
-        showErrors(err.response?.data?.message || "Error updating test");
+        console.error("updateMedicalTest error", err, err.response?.data);
+        showErrors(err.response?.data?.message || err.response?.data || "Error updating test");
         throw err;
       }
     },

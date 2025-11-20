@@ -73,7 +73,19 @@ export default function AddTestModal({ isOpen, onClose, hospitals = [], onSubmit
       ...form,
       price: Number(form.price || 0),
       insurance_co_pay: Number(form.insurance_co_pay || 0),
+      hospital_id: form.hospital_id ? Number(form.hospital_id) : null,
     };
+
+    // Basic client-side validation to avoid server 500s
+    const errors = [];
+    if (!payload.name || String(payload.name).trim() === "") errors.push("Test name is required");
+    if (!payload.category) errors.push("Category is required");
+    if (!payload.hospital_id) errors.push("Hospital selection is required");
+    if (!Number.isFinite(payload.price) || payload.price < 0) errors.push("Price must be a non-negative number");
+    if (errors.length) {
+      showErrors(errors);
+      return;
+    }
     try {
       let created = null;
       if (edit && edit.id) {
@@ -86,8 +98,10 @@ export default function AddTestModal({ isOpen, onClose, hospitals = [], onSubmit
       if (onSubmit) onSubmit(created);
       onClose();
     } catch (err) {
-      console.error("AddTestModal submit error", err);
-      showErrors(err.response?.data?.message || "Failed to save test");
+      console.error("AddTestModal submit error", err, err.response?.data);
+      // Prefer server-provided message or full response body
+      const serverMessage = err.response?.data?.message || err.response?.data || err.message;
+      showErrors(serverMessage || "Failed to save test");
     }
   };
 

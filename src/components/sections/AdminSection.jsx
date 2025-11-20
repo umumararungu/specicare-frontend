@@ -5,6 +5,7 @@ import React, {
   useCallback
 } from "react";
 import { useApp } from "../../context/AppContext";
+import { getField, safeDate } from "../../utils/safe";
 
 import AddTestModal from "../admin/modals/AddTestModal";
 import AddHospitalModal from "../admin/modals/AddHospitalModal";
@@ -397,8 +398,8 @@ const safeUsers = useMemo(() => allUsers || [], [allUsers]);
             <h3>Recent Activities</h3>
 
             <div className="activities-list">
-              {safeAppointments.slice(0, 5).map((appointment) => (
-                <div key={appointment.id} className="activity-item">
+              {safeAppointments.slice(0, 5).map((appointment, idx) => (
+                <div key={`activity-${appointment.id ?? idx}`} className="activity-item">
                   <div className="activity-icon">
                     <i className="fas fa-calendar-plus"></i>
                   </div>
@@ -443,8 +444,8 @@ const safeUsers = useMemo(() => allUsers || [], [allUsers]);
                 <p>No tests found</p>
               </div>
             ) : (
-              testsList.slice.map((test) => (
-                <div key={test.id} className="test-item">
+              testsList.slice.map((test, idx) => (
+                <div key={`test-${test.id ?? idx}`} className="test-item">
                   <div className="test-info">
                     <h4>{test.name}</h4>
                     <p className="hospital">{test.category}</p>
@@ -497,79 +498,109 @@ const safeUsers = useMemo(() => allUsers || [], [allUsers]);
                 <p>No appointments found</p>
               </div>
             ) : (
-              appointmentsList.slice.map((appointment) => (
-                <div key={appointment.id} className="booking-item">
-                  <div className="booking-info">
-                    <div className="appointment-header">
-                      <h4>Reference: {appointment.reference}</h4>
+              appointmentsList.slice.map((appointment, idx) => {
+                const dateDisplay = safeDate(getField(appointment, 'appointment_date', 'appointmentDate', 'date'));
+                const timeSlot = getField(appointment, 'time_slot', 'timeSlot') || appointment.time || '';
+                return (
+                  <div key={`appointment-${appointment.id ?? idx}`} className="booking-item">
+                    <div className="booking-info">
+                      <div className="appointment-header">
+                        <h4>Reference: {appointment.reference}</h4>
 
-                      <span className={`status ${appointment.status}`}>
-                        {appointment.status}
-                      </span>
+                        <span className={`status ${appointment.status}`}>
+                          {appointment.status}
+                        </span>
+                      </div>
+
+                      {(() => {
+                        // Resolve patient name from several possible shapes
+                        const patientName =
+                          (appointment.patient && (appointment.patient.name || appointment.patient.fullName)) ||
+                          appointment.patientName ||
+                          appointment.patient_name ||
+                          (appointment.user && (appointment.user.name || appointment.user.fullName)) ||
+                          appointment.userName ||
+                          getField(appointment, 'patient_name', 'patientName') ||
+                          '—';
+
+                        // Resolve test name from several possible shapes
+                        const testName =
+                          (appointment.medicalTest && (appointment.medicalTest.name || appointment.medicalTest.title)) ||
+                          appointment.medicalTestName ||
+                          appointment.medical_test_name ||
+                          (appointment.test && (appointment.test.name || appointment.test.title)) ||
+                          appointment.testName ||
+                          getField(appointment, 'medical_test_name', 'testName', 'medicalTestName') ||
+                          '—';
+
+                        return (
+                          <>
+                            <p>
+                              <strong>Patient:</strong> {patientName}
+                            </p>
+
+                            <p>
+                              <strong>Test:</strong> {testName}
+                            </p>
+                          </>
+                        );
+                      })()}
+
+                      <p>
+                        <strong>When:</strong> {dateDisplay}{timeSlot ? ` • ${timeSlot}` : ''}
+                      </p>
                     </div>
 
-                    <p>
-                      <strong>Patient:</strong> {appointment.patient_name}
-                    </p>
+                    <div className="booking-actions">
+                      <button
+                        className="secondary-btn"
+                        onClick={() =>
+                          handleUpdateAppointmentStatus(
+                            appointment.id,
+                            "confirmed"
+                          )
+                        }
+                      >
+                        Confirm
+                      </button>
 
-                    <p>
-                      <strong>Test:</strong> {appointment.medical_test_name}
-                    </p>
+                      <button
+                        className="secondary-btn"
+                        onClick={() =>
+                          handleUpdateAppointmentStatus(
+                            appointment.id,
+                            "completed"
+                          )
+                        }
+                      >
+                        Complete
+                      </button>
 
-                    <p>
-                      <strong>Date:</strong> {appointment.appointment_date}
-                    </p>
+                      <button
+                        className="warning-btn"
+                        onClick={() =>
+                          handleUpdateAppointmentStatus(
+                            appointment.id,
+                            "cancelled"
+                          )
+                        }
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        className="cta-button"
+                        onClick={() => {
+                          setSelectedAppointment(appointment);
+                          setResultModalOpen(true);
+                        }}
+                      >
+                        Create Result
+                      </button>
+                    </div>
                   </div>
-
-                  <div className="booking-actions">
-                    <button
-                      className="secondary-btn"
-                      onClick={() =>
-                        handleUpdateAppointmentStatus(
-                          appointment.id,
-                          "confirmed"
-                        )
-                      }
-                    >
-                      Confirm
-                    </button>
-
-                    <button
-                      className="secondary-btn"
-                      onClick={() =>
-                        handleUpdateAppointmentStatus(
-                          appointment.id,
-                          "completed"
-                        )
-                      }
-                    >
-                      Complete
-                    </button>
-
-                    <button
-                      className="warning-btn"
-                      onClick={() =>
-                        handleUpdateAppointmentStatus(
-                          appointment.id,
-                          "cancelled"
-                        )
-                      }
-                    >
-                      Cancel
-                    </button>
-
-                    <button
-                      className="cta-button"
-                      onClick={() => {
-                        setSelectedAppointment(appointment);
-                        setResultModalOpen(true);
-                      }}
-                    >
-                      Create Result
-                    </button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
@@ -603,8 +634,8 @@ const safeUsers = useMemo(() => allUsers || [], [allUsers]);
                 <p>No hospitals found</p>
               </div>
             ) : (
-              hospitalsList.slice.map((hospital) => (
-                <div key={hospital.id} className="hospital-item">
+              hospitalsList.slice.map((hospital, idx) => (
+                <div key={`hospital-${hospital.id ?? idx}`} className="hospital-item">
                   <div className="hospital-info">
                     <h4>{hospital.name}</h4>
 
@@ -661,8 +692,8 @@ const safeUsers = useMemo(() => allUsers || [], [allUsers]);
                 <p>No users found</p>
               </div>
             ) : (
-              usersList.slice.map((user) => (
-                <div key={user.id} className="user-item">
+              usersList.slice.map((user, idx) => (
+                <div key={`user-${user.id ?? idx}`} className="user-item">
                   <div className="user-info">
                     <h4>{user.name}</h4>
                     <p>{user.email}</p>
