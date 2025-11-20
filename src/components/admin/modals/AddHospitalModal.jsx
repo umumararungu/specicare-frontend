@@ -45,6 +45,34 @@ export default function AddHospitalModal({ isOpen, onClose, onSubmit, edit }) {
   }, [edit]);
   const { createHospital, updateHospital, showNotification, showErrors } = useApp();
 
+  // manage modal open/close lifecycle (body class, escape, outside click)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    document.body.classList.add("modal-open");
+
+    const handleKey = (e) => {
+      if (e.key === "Escape") {
+        onClose && onClose();
+      }
+    };
+
+    const handleClick = (e) => {
+      if (e.target && e.target.id === "hospitalModal") {
+        onClose && onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleKey);
+    document.addEventListener("click", handleClick);
+
+    return () => {
+      document.body.classList.remove("modal-open");
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("click", handleClick);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleChange = (e) => {
@@ -77,9 +105,10 @@ export default function AddHospitalModal({ isOpen, onClose, onSubmit, edit }) {
   };
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal-box">
-        <h2>Add Hospital</h2>
+    <div id="hospitalModal" className="modal" style={{ display: "block" }}>
+      <div className="modal-content show">
+        <span className="close" onClick={onClose} style={{ cursor: 'pointer' }}>&times;</span>
+        <h2>{edit ? 'Edit Hospital' : 'Add Hospital'}</h2>
 
         <input name="name" placeholder="Hospital Name" value={form.name} onChange={handleChange} />
 
@@ -129,7 +158,7 @@ export default function AddHospitalModal({ isOpen, onClose, onSubmit, edit }) {
         />
 
         <div className="modal-actions">
-          <button onClick={handleSubmit}>Create Hospital</button>
+          <button onClick={handleSubmit}>{edit ? 'Save Changes' : 'Create Hospital'}</button>
           <button className="close-btn" onClick={onClose}>Cancel</button>
         </div>
       </div>

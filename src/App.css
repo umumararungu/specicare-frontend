@@ -791,6 +791,60 @@ main {
     transform: translateY(0);
 }
 
+/* Ensure modal inputs/buttons in admin modals match BookingModal styles */
+.modal-content input,
+.modal-content textarea,
+.modal-content select {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--gray-border);
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    background-color: var(--white);
+    margin-bottom: 0.75rem;
+}
+
+.modal-content textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.modal-actions button {
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+}
+
+/* Primary action (first button) */
+.modal-actions button:first-child {
+    background: var(--teal);
+    color: var(--white);
+}
+
+/* Secondary/Cancel button */
+.modal-actions .close-btn {
+    background: transparent;
+    border: 1px solid var(--gray-border);
+    color: var(--black);
+}
+
+.modal-content .close {
+    right: 1rem;
+    top: 0.75rem;
+}
+
 /* Loading State */
 .submit-btn:disabled {
     background: var(--gray-medium);
@@ -1161,23 +1215,40 @@ body.modal-open {
     gap: 1rem;
 }
 
-.user-item, .booking-item, .test-item {
+.user-item, .booking-item, .test-item, .hospital-item {
     background: var(--white);
-    padding: 1.5rem;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    padding: 1.25rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    transition: all 0.25s ease;
+    border: 1px solid var(--gray-border);
 }
 
-.user-info, .booking-info, .test-info {
+.user-item:hover, .booking-item:hover, .test-item:hover, .hospital-item:hover {
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+    transform: translateY(-4px);
+}
+
+.user-info, .booking-info, .test-info, .hospital-info {
     flex: 1;
 }
 
-.user-actions, .booking-actions, .test-actions {
+.user-info h4, .booking-info h4, .test-info h4, .hospital-info h4 {
+    color: var(--black);
+    margin-bottom: 0.4rem;
+    font-size: 1.15rem;
+}
+
+.user-actions, .booking-actions, .test-actions, .hospital-actions {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.6rem;
+}
+
+.hospital-item .location {
+    margin-top: 0.25rem;
 }
 
 .filter-controls {

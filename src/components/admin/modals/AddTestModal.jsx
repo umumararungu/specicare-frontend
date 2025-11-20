@@ -34,6 +34,30 @@ export default function AddTestModal({ isOpen, onClose, hospitals = [], onSubmit
 
   const { createMedicalTest, updateMedicalTest, showNotification, showErrors } = useApp();
 
+  // modal lifecycle (body class, escape key, outside click)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    document.body.classList.add("modal-open");
+
+    const handleKey = (e) => {
+      if (e.key === "Escape") onClose && onClose();
+    };
+
+    const handleClick = (e) => {
+      if (e.target && e.target.id === "testModal") onClose && onClose();
+    };
+
+    document.addEventListener("keydown", handleKey);
+    document.addEventListener("click", handleClick);
+
+    return () => {
+      document.body.classList.remove("modal-open");
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("click", handleClick);
+    };
+  }, [isOpen, onClose]);
+
 
   const handleChange = (e) => {
     const { name, value, type } = e.target;
@@ -68,9 +92,12 @@ export default function AddTestModal({ isOpen, onClose, hospitals = [], onSubmit
   };
 
 
+  if (!isOpen) return null;
+
   return (
-    <div className="modal-backdrop">
-      <div className="modal-box">
+    <div id="testModal" className="modal" style={{ display: "block" }}>
+      <div className="modal-content show">
+        <span className="close" onClick={onClose} style={{ cursor: 'pointer' }}>&times;</span>
         <h2>{edit ? "Edit Medical Test" : "Add Medical Test"}</h2>
 
         <input name="name" placeholder="Test Name" value={form.name} onChange={handleChange} />
