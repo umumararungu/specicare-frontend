@@ -1,5 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+  useCallback
+} from "react";
 import { useApp } from "../../context/AppContext";
+
 import AddTestModal from "../admin/modals/AddTestModal";
 import AddHospitalModal from "../admin/modals/AddHospitalModal";
 import CreateResultModal from "../admin/modals/CreateResultModal";
@@ -13,7 +19,6 @@ export default function AdminSection() {
     appointments = [],
     allAppointments = [],
     allUsers = [],
-    adminStats,
     fetchAdminData,
     createMedicalTest,
     updateMedicalTest,
@@ -26,10 +31,13 @@ export default function AdminSection() {
     showNotification,
   } = useApp();
 
-  const safeTests = medicalTests || [];
-  const safeHospitals = hospitals || [];
-  const safeAppointments = allAppointments?.length ? allAppointments : appointments || [];
-  const safeUsers = allUsers || [];
+const safeTests = useMemo(() => medicalTests || [], [medicalTests]);
+const safeHospitals = useMemo(() => hospitals || [], [hospitals]);
+const safeAppointments = useMemo(
+  () => (allAppointments?.length ? allAppointments : appointments || []),
+  [allAppointments, appointments]
+);
+const safeUsers = useMemo(() => allUsers || [], [allUsers]);
 
   const [tab, setTab] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,85 +53,112 @@ export default function AdminSection() {
   const [resultModalOpen, setResultModalOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
 
-  useEffect(() => {
-    fetchAdminData().catch((e) => {
+  /* ---------------------------------------------
+      SAFE CALLBACKS
+  ---------------------------------------------- */
+
+  const safeFetchAdminData = useCallback(async () => {
+    try {
+      await fetchAdminData();
+    } catch (e) {
       console.error("fetchAdminData failed", e);
       showNotification("Failed to load admin data", "error");
-    });
-  }, []);
+    }
+  }, [fetchAdminData, showNotification]);
+
+  const applySearchAndFilter = useCallback(
+    (items, options = {}) => {
+      const q = searchQuery.trim().toLowerCase();
+      const f = filter.trim().toLowerCase();
+
+      let out = [...(items || [])];
+
+      if (q) {
+        out = out.filter((it) =>
+          JSON.stringify(it).toLowerCase().includes(q)
+        );
+      }
+
+      if (f) {
+        if (options.filterBy) {
+          out = out.filter((it) =>
+            String(it[options.filterBy] ?? "")
+              .toLowerCase()
+              .includes(f)
+          );
+        } else {
+          out = out.filter((it) =>
+            JSON.stringify(it).toLowerCase().includes(f)
+          );
+        }
+      }
+
+      return out;
+    },
+    [searchQuery, filter]
+  );
+
+  const paginate = useCallback(
+    (items) => {
+      const total = items.length;
+      const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      const from = (page - 1) * PAGE_SIZE;
+      return {
+        slice: items.slice(from, from + PAGE_SIZE),
+        total,
+        pages,
+      };
+    },
+    [page]
+  );
+
+  /* ---------------------------------------------
+      EFFECTS
+  ---------------------------------------------- */
+
+  useEffect(() => {
+    safeFetchAdminData();
+  }, [safeFetchAdminData]);
 
   useEffect(() => {
     setPage(1);
   }, [searchQuery, filter, tab]);
 
-  function applySearchAndFilter(items, options = {}) {
-    const q = (searchQuery || "").trim().toLowerCase();
-    const f = (filter || "").trim().toLowerCase();
-
-    let out = (items || []).slice();
-
-    if (q) {
-      out = out.filter((it) => {
-        const s = JSON.stringify(it).toLowerCase();
-        return s.includes(q);
-      });
-    }
-
-    if (f) {
-      if (options.filterBy) {
-        out = out.filter((it) => {
-          const val = String(it[options.filterBy] ?? "").toLowerCase();
-          return val.includes(f);
-        });
-      } else {
-        out = out.filter((it) => JSON.stringify(it).toLowerCase().includes(f));
-      }
-    }
-
-    return out;
-  }
-
-  function paginate(items) {
-    const total = items.length;
-    const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-    const from = (page - 1) * PAGE_SIZE;
-    const slice = items.slice(from, from + PAGE_SIZE);
-    return { slice, total, pages };
-  }
+  /* ---------------------------------------------
+      MEMO LISTS
+  ---------------------------------------------- */
 
   const testsList = useMemo(() => {
-    const filtered = applySearchAndFilter(safeTests, { filterBy: "category" });
-    return paginate(filtered);
-  }, [safeTests, searchQuery, filter, page]);
+    return paginate(
+      applySearchAndFilter(safeTests, { filterBy: "category" })
+    );
+  }, [safeTests, applySearchAndFilter, paginate]);
 
   const hospitalsList = useMemo(() => {
-    const filtered = applySearchAndFilter(safeHospitals, { filterBy: "district" });
-    return paginate(filtered);
-  }, [safeHospitals, searchQuery, filter, page]);
+    return paginate(
+      applySearchAndFilter(safeHospitals, { filterBy: "district" })
+    );
+  }, [safeHospitals, applySearchAndFilter, paginate]);
 
   const appointmentsList = useMemo(() => {
-    const filtered = applySearchAndFilter(safeAppointments, { filterBy: "status" });
-    return paginate(filtered);
-  }, [safeAppointments, searchQuery, filter, page]);
+    return paginate(
+      applySearchAndFilter(safeAppointments, { filterBy: "status" })
+    );
+  }, [safeAppointments, applySearchAndFilter, paginate]);
 
   const usersList = useMemo(() => {
-    const filtered = applySearchAndFilter(safeUsers, { filterBy: "email" });
-    return paginate(filtered);
-  }, [safeUsers, searchQuery, filter, page]);
+    return paginate(
+      applySearchAndFilter(safeUsers, { filterBy: "email" })
+    );
+  }, [safeUsers, applySearchAndFilter, paginate]);
 
-  const handleOpenCreateTest = () => {
-    setTestEdit(null);
-    setTestModalOpen(true);
-  };
-
-  const handleOpenEditTest = (t) => {
-    setTestEdit(t);
-    setTestModalOpen(true);
-  };
+  /* ---------------------------------------------
+      ACTION HANDLERS
+  ---------------------------------------------- */
 
   const handleSaveTest = async (payload) => {
     try {
-      if (testEdit && testEdit.id) {
+      if (testEdit?.id) {
         await updateMedicalTest(testEdit.id, payload);
         showNotification("Test updated", "success");
       } else {
@@ -131,9 +166,9 @@ export default function AdminSection() {
         showNotification("Test created", "success");
       }
       setTestModalOpen(false);
-      await fetchAdminData();
-    } catch (err) {
-      console.error("save test", err);
+      await safeFetchAdminData();
+    } catch (e) {
+      console.error(e);
       showNotification("Failed to save test", "error");
     }
   };
@@ -143,26 +178,16 @@ export default function AdminSection() {
     try {
       await deleteMedicalTest(id);
       showNotification("Test deleted", "success");
-      await fetchAdminData();
-    } catch (err) {
-      console.error("delete test", err);
+      await safeFetchAdminData();
+    } catch (e) {
+      console.error(e);
       showNotification("Failed to delete test", "error");
     }
   };
 
-  const handleOpenCreateHospital = () => {
-    setHospitalEdit(null);
-    setHospitalModalOpen(true);
-  };
-
-  const handleOpenEditHospital = (h) => {
-    setHospitalEdit(h);
-    setHospitalModalOpen(true);
-  };
-
   const handleSaveHospital = async (payload) => {
     try {
-      if (hospitalEdit && hospitalEdit.id) {
+      if (hospitalEdit?.id) {
         await updateHospital(hospitalEdit.id, payload);
         showNotification("Hospital updated", "success");
       } else {
@@ -170,9 +195,9 @@ export default function AdminSection() {
         showNotification("Hospital created", "success");
       }
       setHospitalModalOpen(false);
-      await fetchAdminData();
-    } catch (err) {
-      console.error("save hospital", err);
+      await safeFetchAdminData();
+    } catch (e) {
+      console.error(e);
       showNotification("Failed to save hospital", "error");
     }
   };
@@ -182,9 +207,9 @@ export default function AdminSection() {
     try {
       await deleteHospital(id);
       showNotification("Hospital deleted", "success");
-      await fetchAdminData();
-    } catch (err) {
-      console.error("delete hospital", err);
+      await safeFetchAdminData();
+    } catch (e) {
+      console.error(e);
       showNotification("Failed to delete hospital", "error");
     }
   };
@@ -193,16 +218,11 @@ export default function AdminSection() {
     try {
       await updateAppointmentStatus(id, status);
       showNotification("Appointment updated", "success");
-      await fetchAdminData();
-    } catch (err) {
-      console.error("update appointment", err);
+      await safeFetchAdminData();
+    } catch (e) {
+      console.error(e);
       showNotification("Failed to update appointment", "error");
     }
-  };
-
-  const handleOpenCreateResult = (appt) => {
-    setSelectedAppointment(appt);
-    setResultModalOpen(true);
   };
 
   const handleSaveResult = async (formData) => {
@@ -211,36 +231,58 @@ export default function AdminSection() {
       showNotification("Test result created", "success");
       setResultModalOpen(false);
       setSelectedAppointment(null);
-      await fetchAdminData();
-    } catch (err) {
-      console.error("create result", err);
+      await safeFetchAdminData();
+    } catch (e) {
+      console.error(e);
       showNotification("Failed to create result", "error");
     }
   };
 
+  /* ---------------------------------------------
+      PAGINATION UI
+  ---------------------------------------------- */
+
   const renderPagination = (totalPages) => {
-    if (!totalPages || totalPages === 1) return null;
-    const pages = [];
-    for (let p = 1; p <= totalPages; p++) pages.push(p);
+    if (totalPages <= 1) return null;
+
     return (
       <div className="admin-pager">
-        <button disabled={page === 1} onClick={() => setPage((s) => Math.max(1, s - 1))}>
+        <button
+          disabled={page === 1}
+          onClick={() => setPage((p) => p - 1)}
+        >
           Prev
         </button>
-        {pages.map((p) => (
-          <button key={p} className={p === page ? "active" : ""} onClick={() => setPage(p)}>
-            {p}
-          </button>
-        ))}
-        <button disabled={page === totalPages} onClick={() => setPage((s) => Math.min(totalPages, s + 1))}>
+
+        {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+          (p) => (
+            <button
+              key={p}
+              className={p === page ? "active" : ""}
+              onClick={() => setPage(p)}
+            >
+              {p}
+            </button>
+          )
+        )}
+
+        <button
+          disabled={page === totalPages}
+          onClick={() => setPage((p) => p + 1)}
+        >
           Next
         </button>
       </div>
     );
   };
 
+  /* ---------------------------------------------
+      RENDER
+  ---------------------------------------------- */
+
   return (
     <section className="section active">
+      {/* ------------------- STATS ------------------- */}
       <div className="admin-stats">
         <div className="admin-stat-card">
           <div className="stat-icon">
@@ -251,6 +293,7 @@ export default function AdminSection() {
             <p>Total Users</p>
           </div>
         </div>
+
         <div className="admin-stat-card">
           <div className="stat-icon">
             <i className="fas fa-calendar-check"></i>
@@ -260,6 +303,7 @@ export default function AdminSection() {
             <p>Total Bookings</p>
           </div>
         </div>
+
         <div className="admin-stat-card">
           <div className="stat-icon">
             <i className="fas fa-flask"></i>
@@ -269,6 +313,7 @@ export default function AdminSection() {
             <p>Medical Tests</p>
           </div>
         </div>
+
         <div className="admin-stat-card">
           <div className="stat-icon">
             <i className="fas fa-hospital"></i>
@@ -280,18 +325,20 @@ export default function AdminSection() {
         </div>
       </div>
 
+      {/* ------------------- SEARCH & FILTER ------------------- */}
       <div className="tab-header">
         <h2>Admin Dashboard</h2>
+
         <div className="filter-controls">
           <input
             type="text"
             placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="form-group"
           />
-          <select 
-            value={filter} 
+
+          <select
+            value={filter}
             onChange={(e) => setFilter(e.target.value)}
             className="small"
           >
@@ -303,32 +350,37 @@ export default function AdminSection() {
         </div>
       </div>
 
+      {/* ------------------- TABS ------------------- */}
       <div className="dashboard-actions">
-        <button 
+        <button
           className={`dashboard-btn ${tab === "overview" ? "active" : ""}`}
           onClick={() => setTab("overview")}
         >
           <i className="fas fa-chart-bar"></i> Overview
         </button>
-        <button 
+
+        <button
           className={`dashboard-btn ${tab === "tests" ? "active" : ""}`}
           onClick={() => setTab("tests")}
         >
           <i className="fas fa-flask"></i> Tests
         </button>
-        <button 
+
+        <button
           className={`dashboard-btn ${tab === "appointments" ? "active" : ""}`}
           onClick={() => setTab("appointments")}
         >
           <i className="fas fa-calendar-alt"></i> Appointments
         </button>
-        <button 
+
+        <button
           className={`dashboard-btn ${tab === "hospitals" ? "active" : ""}`}
           onClick={() => setTab("hospitals")}
         >
           <i className="fas fa-hospital"></i> Hospitals
         </button>
-        <button 
+
+        <button
           className={`dashboard-btn ${tab === "users" ? "active" : ""}`}
           onClick={() => setTab("users")}
         >
@@ -336,192 +388,306 @@ export default function AdminSection() {
         </button>
       </div>
 
-      <div className="dashboard-tabs">
-        {tab === "overview" && (
-          <div className="dashboard-tab active">
-            <div className="recent-activities">
-              <h3>Recent Activities</h3>
-              <div className="activities-list">
-                {safeAppointments.slice(0, 5).map((appointment) => (
-                  <div key={appointment.id} className="activity-item">
-                    <div className="activity-icon">
-                      <i className="fas fa-calendar-plus"></i>
-                    </div>
-                    <div className="activity-content">
-                      <p>New appointment {appointment.reference}</p>
-                      <div className="activity-time">{appointment.appointment_date}</div>
+      {/* ----------------------------------------------
+            OVERVIEW TAB
+      ----------------------------------------------- */}
+      {tab === "overview" && (
+        <div className="dashboard-tab active">
+          <div className="recent-activities">
+            <h3>Recent Activities</h3>
+
+            <div className="activities-list">
+              {safeAppointments.slice(0, 5).map((appointment) => (
+                <div key={appointment.id} className="activity-item">
+                  <div className="activity-icon">
+                    <i className="fas fa-calendar-plus"></i>
+                  </div>
+
+                  <div className="activity-content">
+                    <p>New appointment {appointment.reference}</p>
+
+                    <div className="activity-time">
+                      {appointment.appointment_date}
                     </div>
                   </div>
-                ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ----------------------------------------------
+            TESTS TAB
+      ----------------------------------------------- */}
+      {tab === "tests" && (
+        <div className="dashboard-tab active">
+          <div className="tab-header">
+            <h3>Medical Tests</h3>
+
+            <button
+              className="cta-button"
+              onClick={() => {
+                setTestEdit(null);
+                setTestModalOpen(true);
+              }}
+            >
+              <i className="fas fa-plus"></i> Create Test
+            </button>
+          </div>
+
+          <div className="tests-list">
+            {testsList.slice.length === 0 ? (
+              <div className="no-tests">
+                <i className="fas fa-flask"></i>
+                <p>No tests found</p>
               </div>
-            </div>
-          </div>
-        )}
-
-        {tab === "tests" && (
-          <div className="dashboard-tab active">
-            <div className="tab-header">
-              <h3>Medical Tests</h3>
-              <button className="cta-button" onClick={handleOpenCreateTest}>
-                <i className="fas fa-plus"></i> Create Test
-              </button>
-            </div>
-            <div className="tests-list">
-              {testsList.slice.length === 0 ? (
-                <div className="no-tests">
-                  <i className="fas fa-flask"></i>
-                  <p>No tests found</p>
-                </div>
-              ) : (
-                testsList.slice.map((test) => (
-                  <div key={test.id} className="test-item">
-                    <div className="test-info">
-                      <h4>{test.name}</h4>
-                      <p className="hospital">{test.category}</p>
-                      <p className="description">{test.description}</p>
-                      <p className="price">{test.price?.toLocaleString()} RWF</p>
-                    </div>
-                    <div className="test-actions">
-                      <button className="secondary-btn" onClick={() => handleOpenEditTest(test)}>
-                        <i className="fas fa-edit"></i> Edit
-                      </button>
-                      <button className="danger-btn" onClick={() => handleDeleteTest(test.id)}>
-                        <i className="fas fa-trash"></i> Delete
-                      </button>
-                    </div>
+            ) : (
+              testsList.slice.map((test) => (
+                <div key={test.id} className="test-item">
+                  <div className="test-info">
+                    <h4>{test.name}</h4>
+                    <p className="hospital">{test.category}</p>
+                    <p className="description">{test.description}</p>
+                    <p className="price">
+                      {test.price?.toLocaleString()} RWF
+                    </p>
                   </div>
-                ))
-              )}
-            </div>
-            {renderPagination(testsList.pages)}
-          </div>
-        )}
 
-        {tab === "appointments" && (
-          <div className="dashboard-tab active">
-            <div className="tab-header">
-              <h3>Appointments</h3>
-            </div>
-            <div className="bookings-list">
-              {appointmentsList.slice.length === 0 ? (
-                <div className="no-appointments">
-                  <i className="fas fa-calendar-times"></i>
-                  <p>No appointments found</p>
-                </div>
-              ) : (
-                appointmentsList.slice.map((appointment) => (
-                  <div key={appointment.id} className="booking-item">
-                    <div className="booking-info">
-                      <div className="appointment-header">
-                        <h4>Reference: {appointment.reference}</h4>
-                        <span className={`status ${appointment.status}`}>
-                          {appointment.status}
-                        </span>
-                      </div>
-                      <p><strong>Patient:</strong> {appointment.patient_name}</p>
-                      <p><strong>Test:</strong> {appointment.medical_test_name}</p>
-                      <p><strong>Date:</strong> {appointment.appointment_date}</p>
-                    </div>
-                    <div className="booking-actions">
-                      <button className="secondary-btn" onClick={() => handleUpdateAppointmentStatus(appointment.id, "confirmed")}>
-                        Confirm
-                      </button>
-                      <button className="secondary-btn" onClick={() => handleUpdateAppointmentStatus(appointment.id, "completed")}>
-                        Complete
-                      </button>
-                      <button className="warning-btn" onClick={() => handleUpdateAppointmentStatus(appointment.id, "cancelled")}>
-                        Cancel
-                      </button>
-                      <button className="cta-button" onClick={() => handleOpenCreateResult(appointment)}>
-                        Create Result
-                      </button>
-                    </div>
+                  <div className="test-actions">
+                    <button
+                      className="secondary-btn"
+                      onClick={() => {
+                        setTestEdit(test);
+                        setTestModalOpen(true);
+                      }}
+                    >
+                      <i className="fas fa-edit"></i> Edit
+                    </button>
+
+                    <button
+                      className="danger-btn"
+                      onClick={() => handleDeleteTest(test.id)}
+                    >
+                      <i className="fas fa-trash"></i> Delete
+                    </button>
                   </div>
-                ))
-              )}
-            </div>
-            {renderPagination(appointmentsList.pages)}
-          </div>
-        )}
-
-        {tab === "hospitals" && (
-          <div className="dashboard-tab active">
-            <div className="tab-header">
-              <h3>Hospitals</h3>
-              <button className="cta-button" onClick={handleOpenCreateHospital}>
-                <i className="fas fa-plus"></i> Create Hospital
-              </button>
-            </div>
-            <div className="hospitals-list">
-              {hospitalsList.slice.length === 0 ? (
-                <div className="no-hospitals">
-                  <i className="fas fa-hospital"></i>
-                  <p>No hospitals found</p>
                 </div>
-              ) : (
-                hospitalsList.slice.map((hospital) => (
-                  <div key={hospital.id} className="hospital-item">
-                    <div className="hospital-info">
-                      <h4>{hospital.name}</h4>
-                      <p className="location">
-                        <i className="fas fa-map-marker-alt"></i>
-                        {hospital.district}, {hospital.province}
-                      </p>
-                      <p className="description">{hospital.type} • {hospital.phone}</p>
-                    </div>
-                    <div className="hospital-actions">
-                      <button className="secondary-btn" onClick={() => handleOpenEditHospital(hospital)}>
-                        <i className="fas fa-edit"></i> Edit
-                      </button>
-                      <button className="danger-btn" onClick={() => handleDeleteHospital(hospital.id)}>
-                        <i className="fas fa-trash"></i> Delete
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            {renderPagination(hospitalsList.pages)}
+              ))
+            )}
           </div>
-        )}
 
-        {tab === "users" && (
-          <div className="dashboard-tab active">
-            <div className="tab-header">
-              <h3>Users</h3>
-            </div>
-            <div className="users-list">
-              {usersList.slice.length === 0 ? (
-                <div className="no-users">
-                  <i className="fas fa-users"></i>
-                  <p>No users found</p>
+          {renderPagination(testsList.pages)}
+        </div>
+      )}
+
+      {/* ----------------------------------------------
+            APPOINTMENTS TAB
+      ----------------------------------------------- */}
+      {tab === "appointments" && (
+        <div className="dashboard-tab active">
+          <div className="tab-header">
+            <h3>Appointments</h3>
+          </div>
+
+          <div className="bookings-list">
+            {appointmentsList.slice.length === 0 ? (
+              <div className="no-appointments">
+                <i className="fas fa-calendar-times"></i>
+                <p>No appointments found</p>
+              </div>
+            ) : (
+              appointmentsList.slice.map((appointment) => (
+                <div key={appointment.id} className="booking-item">
+                  <div className="booking-info">
+                    <div className="appointment-header">
+                      <h4>Reference: {appointment.reference}</h4>
+
+                      <span className={`status ${appointment.status}`}>
+                        {appointment.status}
+                      </span>
+                    </div>
+
+                    <p>
+                      <strong>Patient:</strong> {appointment.patient_name}
+                    </p>
+
+                    <p>
+                      <strong>Test:</strong> {appointment.medical_test_name}
+                    </p>
+
+                    <p>
+                      <strong>Date:</strong> {appointment.appointment_date}
+                    </p>
+                  </div>
+
+                  <div className="booking-actions">
+                    <button
+                      className="secondary-btn"
+                      onClick={() =>
+                        handleUpdateAppointmentStatus(
+                          appointment.id,
+                          "confirmed"
+                        )
+                      }
+                    >
+                      Confirm
+                    </button>
+
+                    <button
+                      className="secondary-btn"
+                      onClick={() =>
+                        handleUpdateAppointmentStatus(
+                          appointment.id,
+                          "completed"
+                        )
+                      }
+                    >
+                      Complete
+                    </button>
+
+                    <button
+                      className="warning-btn"
+                      onClick={() =>
+                        handleUpdateAppointmentStatus(
+                          appointment.id,
+                          "cancelled"
+                        )
+                      }
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      className="cta-button"
+                      onClick={() => {
+                        setSelectedAppointment(appointment);
+                        setResultModalOpen(true);
+                      }}
+                    >
+                      Create Result
+                    </button>
+                  </div>
                 </div>
-              ) : (
-                usersList.slice.map((user) => (
-                  <div key={user.id} className="user-item">
-                    <div className="user-info">
-                      <h4>{user.name}</h4>
-                      <p>{user.email}</p>
-                      <p>{user.phone}</p>
-                    </div>
-                    <div className="user-actions">
-                      <button className="view-btn">
-                        <i className="fas fa-eye"></i> View
-                      </button>
-                      <button className="suspend-btn">
-                        <i className="fas fa-pause"></i> Suspend
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            {renderPagination(usersList.pages)}
+              ))
+            )}
           </div>
-        )}
-      </div>
 
-      {/* Modals (external modal components) */}
+          {renderPagination(appointmentsList.pages)}
+        </div>
+      )}
+
+      {/* ----------------------------------------------
+            HOSPITALS TAB
+      ----------------------------------------------- */}
+      {tab === "hospitals" && (
+        <div className="dashboard-tab active">
+          <div className="tab-header">
+            <h3>Hospitals</h3>
+
+            <button
+              className="cta-button"
+              onClick={() => {
+                setHospitalEdit(null);
+                setHospitalModalOpen(true);
+              }}
+            >
+              <i className="fas fa-plus"></i> Create Hospital
+            </button>
+          </div>
+
+          <div className="hospitals-list">
+            {hospitalsList.slice.length === 0 ? (
+              <div className="no-hospitals">
+                <i className="fas fa-hospital"></i>
+                <p>No hospitals found</p>
+              </div>
+            ) : (
+              hospitalsList.slice.map((hospital) => (
+                <div key={hospital.id} className="hospital-item">
+                  <div className="hospital-info">
+                    <h4>{hospital.name}</h4>
+
+                    <p className="location">
+                      <i className="fas fa-map-marker-alt"></i>
+                      {hospital.district}, {hospital.province}
+                    </p>
+
+                    <p className="description">
+                      {hospital.type} • {hospital.phone}
+                    </p>
+                  </div>
+
+                  <div className="hospital-actions">
+                    <button
+                      className="secondary-btn"
+                      onClick={() => {
+                        setHospitalEdit(hospital);
+                        setHospitalModalOpen(true);
+                      }}
+                    >
+                      <i className="fas fa-edit"></i> Edit
+                    </button>
+
+                    <button
+                      className="danger-btn"
+                      onClick={() => handleDeleteHospital(hospital.id)}
+                    >
+                      <i className="fas fa-trash"></i> Delete
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {renderPagination(hospitalsList.pages)}
+        </div>
+      )}
+
+      {/* ----------------------------------------------
+            USERS TAB
+      ----------------------------------------------- */}
+      {tab === "users" && (
+        <div className="dashboard-tab active">
+          <div className="tab-header">
+            <h3>Users</h3>
+          </div>
+
+          <div className="users-list">
+            {usersList.slice.length === 0 ? (
+              <div className="no-users">
+                <i className="fas fa-users"></i>
+                <p>No users found</p>
+              </div>
+            ) : (
+              usersList.slice.map((user) => (
+                <div key={user.id} className="user-item">
+                  <div className="user-info">
+                    <h4>{user.name}</h4>
+                    <p>{user.email}</p>
+                    <p>{user.phone}</p>
+                  </div>
+
+                  <div className="user-actions">
+                    <button className="view-btn">
+                      <i className="fas fa-eye"></i> View
+                    </button>
+
+                    <button className="suspend-btn">
+                      <i className="fas fa-pause"></i> Suspend
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {renderPagination(usersList.pages)}
+        </div>
+      )}
+
+      {/* ------------------- MODALS ------------------- */}
       {testModalOpen && (
         <AddTestModal
           isOpen={testModalOpen}
@@ -544,7 +710,10 @@ export default function AdminSection() {
       {resultModalOpen && selectedAppointment && (
         <CreateResultModal
           isOpen={resultModalOpen}
-          onClose={() => { setResultModalOpen(false); setSelectedAppointment(null); }}
+          onClose={() => {
+            setResultModalOpen(false);
+            setSelectedAppointment(null);
+          }}
           appointment={selectedAppointment}
           onSubmit={handleSaveResult}
         />
