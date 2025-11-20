@@ -10,9 +10,18 @@ import React, {
 import axios from "axios";
 import { useSocket } from "../hooks/useSocket";
 
-/* ---------------------------
-   Helpers (outside component)
-   --------------------------- */
+/*
+  AppContext.js - Stable, lint-clean, token-safe App context.
+  Key points:
+  - token comes from login response (res.data.token) and/or localStorage
+  - /users/me is used only to refresh profile, NOT to obtain token
+  - all callbacks are wrapped with useCallback (stable references for deps)
+  - socket integration uses useSocket and a short cooldown to avoid repeated refreshes
+*/
+
+/* -----------------------
+   Utilities (pure)
+   ----------------------- */
 const toCamel = (s) => String(s).replace(/_([a-z])/g, (_, p1) => p1.toUpperCase());
 
 const camelizeObject = (obj) => {
@@ -25,15 +34,15 @@ const camelizeObject = (obj) => {
   return out;
 };
 
-/* ---------------------------
-   Axios default config
-   --------------------------- */
+/* -----------------------
+   Axios defaults
+   ----------------------- */
 axios.defaults.withCredentials = false;
 axios.defaults.headers.common["Content-Type"] = "application/json";
 
-/* ---------------------------
-   Context
-   --------------------------- */
+/* -----------------------
+   Context creation
+   ----------------------- */
 const AppContext = createContext();
 export const useApp = () => {
   const ctx = useContext(AppContext);
@@ -41,11 +50,11 @@ export const useApp = () => {
   return ctx;
 };
 
-/* ---------------------------
+/* -----------------------
    Provider
-   --------------------------- */
+   ----------------------- */
 export const AppProvider = ({ children }) => {
-  // State
+  // --- State ---
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const raw = localStorage.getItem("currentUser");
@@ -60,7 +69,7 @@ export const AppProvider = ({ children }) => {
   const [currentResultDraft, setCurrentResultDraft] = useState(null);
   const [medicalTests, setMedicalTests] = useState([]);
   const [hospitals, setHospitals] = useState([]);
-  const [activeSection, setActiveSection] = useState("home");
+  const [activeSection, setActiveSection] = useState("home"); // home | login | dashboard | admin
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState(null);
   const [notifications, setNotifications] = useState([]);
@@ -69,30 +78,26 @@ export const AppProvider = ({ children }) => {
   const [allUsers, setAllUsers] = useState([]);
   const [allAppointments, setAllAppointments] = useState([]);
 
-  // Config
+  // --- Config ---
   const rawUrl = (process.env.REACT_APP_API_URL || "http://localhost:5000").replace(/\/+$/, "");
   const API_BASE = `${rawUrl}/api`;
   const SOCKET_URL = rawUrl;
 
   const isAdmin = currentUser?.role === "admin";
 
-  // Refs & cooldowns
+  // --- Refs / cooldowns ---
   const isInitializing = useRef(false);
   const lastSocketRefresh = useRef(0);
   const SOCKET_COOLDOWN_MS = 3000;
 
-  /* ---------------------------
-     Stable small utilities wrapped with useCallback so they can be safely used in deps
-     --------------------------- */
+  /* -----------------------
+     Small stable helpers
+     ----------------------- */
   const clearErrors = useCallback(() => setErrors([]), []);
-
   const showNotification = useCallback((message, type = "info", duration = 5000) => {
     setNotification({ message, type });
-    if (duration > 0) {
-      setTimeout(() => setNotification(null), duration);
-    }
+    if (duration > 0) setTimeout(() => setNotification(null), duration);
   }, []);
-
   const showErrors = useCallback(
     (errorMessages, type = "error") => {
       if (Array.isArray(errorMessages)) {
@@ -106,29 +111,29 @@ export const AppProvider = ({ children }) => {
     [showNotification]
   );
 
-  /* ---------------------------
-     Persist token and set axios header when currentUser changes
-     (token stored on login as res.data.token; currentUser includes token field)
-     --------------------------- */
+  /* -----------------------
+     Persist token & currentUser -> axios header
+     (token MUST come from login or localStorage)
+     ----------------------- */
   useEffect(() => {
-    if (currentUser?.token) {
-      axios.defaults.headers.common["Authorization"] = `Bearer ${currentUser.token}`;
-      try {
+    try {
+      if (currentUser?.token) {
+        axios.defaults.headers.common["Authorization"] = `Bearer ${currentUser.token}`;
         localStorage.setItem("currentUser", JSON.stringify(currentUser));
         localStorage.setItem("token", currentUser.token);
-      } catch {}
-    } else {
-      delete axios.defaults.headers.common["Authorization"];
-      try {
+      } else {
+        delete axios.defaults.headers.common["Authorization"];
         localStorage.removeItem("currentUser");
         localStorage.removeItem("token");
-      } catch {}
+      }
+    } catch {
+      // ignore localStorage errors
     }
   }, [currentUser]);
 
-  /* ---------------------------
-     Helper fetchers (stable)
-     --------------------------- */
+  /* -----------------------
+     Fetch helpers (stable callbacks)
+     ----------------------- */
   const fetchAdminData = useCallback(async () => {
     try {
       const [statsRes, usersRes, appointmentsRes] = await Promise.all([
@@ -166,9 +171,11 @@ export const AppProvider = ({ children }) => {
     }
   }, [API_BASE, showErrors]);
 
-  /* ---------------------------
-     initializeData: guarded, only runs when token available
-     --------------------------- */
+  /* -----------------------
+     initializeData (guarded)
+     - token is read from currentUser.token OR localStorage token
+     - does not assume /users/me returns token
+     ----------------------- */
   const initializeData = useCallback(async () => {
     const token = currentUser?.token || localStorage.getItem("token");
     if (!token) return;
@@ -176,15 +183,18 @@ export const AppProvider = ({ children }) => {
 
     isInitializing.current = true;
     setIsLoading(true);
-
     try {
+      // ensure axios has header
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-      // get user and base data
+      // refresh profile (server returns user WITHOUT token)
       const userRes = await axios.get(`${API_BASE}/users/me`);
-      const camelUser = camelizeObject(userRes.data?.user);
-      setCurrentUser((prev) => ({ ...(prev || {}), ...camelUser, token }));
+      const camelUser = camelizeObject(userRes.data?.user || {});
+      // preserve token from storage
+      const mergedUser = { ...(camelUser || {}), token };
+      setCurrentUser(mergedUser);
 
+      // fetch base lists
       const [testsRes, hospitalsRes, apptsRes] = await Promise.all([
         axios.get(`${API_BASE}/medical-test`),
         axios.get(`${API_BASE}/hospitals`),
@@ -195,14 +205,14 @@ export const AppProvider = ({ children }) => {
       setHospitals(camelizeObject(hospitalsRes.data?.hospitals || []));
       setAppointments(camelizeObject(apptsRes.data || []));
 
-      if (camelUser?.role === "admin") {
+      if (mergedUser?.role === "admin") {
         await fetchAdminData();
       }
       await fetchNotifications();
-
-      setActiveSection(camelUser?.role === "admin" ? "admin" : "dashboard");
+      setActiveSection(mergedUser?.role === "admin" ? "admin" : "dashboard");
     } catch (err) {
       console.error("initializeData error", err);
+      // invalid token or other error -> clear auth
       setCurrentUser(null);
       localStorage.removeItem("currentUser");
       localStorage.removeItem("token");
@@ -215,53 +225,60 @@ export const AppProvider = ({ children }) => {
     }
   }, [API_BASE, currentUser?.token, fetchAdminData, fetchNotifications]);
 
-  // Run initialize once when provider mounts (if token exists)
+  // run once on mount to pick up any token in localStorage
   useEffect(() => {
     initializeData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // empty on purpose – initializeData checks token itself
+  }, []); // initializeData guards token itself
 
-  /* ---------------------------
-     Socket integration - HYBRID:
-       - Admin: real-time appointments and admin data refresh (debounced)
-       - All users: receive notifications via socket (no forced refresh)
-     --------------------------- */
-  useSocket(
-    SOCKET_URL,
-    { transports: ["websocket"], withCredentials: true },
-    {
-      notification: (payload) => {
-        try {
-          const p = camelizeObject(payload);
-          setNotifications((prev) => [p, ...(prev || [])]);
-        } catch (e) {
-          console.error("socket notification handler error", e);
-        }
-      },
-      "appointment:update": async () => {
-        try {
-          const now = Date.now();
-          if (now - lastSocketRefresh.current < SOCKET_COOLDOWN_MS) return;
-          lastSocketRefresh.current = now;
-
-          // admin gets live admin refresh, users only refresh appointments
-          if (currentUser?.role === "admin") {
-            await fetchAdminData();
-          } else if (currentUser) {
-            const res = await axios.get(`${API_BASE}/appointments/my`);
-            setAppointments(camelizeObject(res.data || []));
-          }
-        } catch (e) {
-          console.error("socket appointment:update handler error", e);
-        }
-      },
+  /* -----------------------
+     Socket integration (useSocket)
+     - anonymized handlers but use cooldown to avoid thrashing
+     ----------------------- */
+useSocket(
+  SOCKET_URL,
+  {
+    transports: ["websocket"],
+    auth: {
+      token: currentUser?.token || localStorage.getItem("token") || null,
     },
-    !!currentUser // enabled only when a user object exists
-  );
+    reconnection: true,
+  },
+  {
+    notification: (payload) => {
+      try {
+        const p = camelizeObject(payload);
+        setNotifications((prev) => [p, ...(prev || [])]);
+      } catch (e) {
+        console.error("socket notification handler error", e);
+      }
+    },
 
-  /* ---------------------------
-     Auth functions: login, logout, register, forgot/reset
-     --------------------------- */
+    "appointment:update": async () => {
+      try {
+        const now = Date.now();
+        if (now - lastSocketRefresh.current < SOCKET_COOLDOWN_MS) return;
+        lastSocketRefresh.current = now;
+
+        if (currentUser?.role === "admin") {
+          await fetchAdminData();
+        } else if (currentUser) {
+          const res = await axios.get(`${API_BASE}/appointments/my`);
+          setAppointments(camelizeObject(res.data || []));
+        }
+      } catch (e) {
+        console.error("socket appointment:update handler", e);
+      }
+    },
+  },
+  !!currentUser // enable only when logged in
+);
+
+  /* -----------------------
+     Auth functions
+     - login MUST get token from response and store it
+     - /users/me won't provide token, so use login token
+     ----------------------- */
   const login = useCallback(
     async (email, password) => {
       try {
@@ -269,16 +286,16 @@ export const AppProvider = ({ children }) => {
         clearErrors();
         const res = await axios.post(`${API_BASE}/users/login`, { email, password });
         if (res.data?.success && res.data.token) {
-          // backend returns token + user (you confirmed)
           const token = res.data.token;
           const user = camelizeObject(res.data.user || {});
-          // persist token and user
           const newUser = { ...user, token };
           setCurrentUser(newUser);
-          localStorage.setItem("token", token);
-          localStorage.setItem("currentUser", JSON.stringify(newUser));
+          try {
+            localStorage.setItem("token", token);
+            localStorage.setItem("currentUser", JSON.stringify(newUser));
+          } catch {}
           showNotification(res.data.message || "Login successful", "success");
-          // initializeData will run (either immediately via effect or we call it)
+          // initialize other data
           await initializeData();
           return { ok: true, user: newUser };
         } else {
@@ -324,8 +341,10 @@ export const AppProvider = ({ children }) => {
           const user = camelizeObject(res.data.user || {});
           const newUser = { ...user, token };
           setCurrentUser(newUser);
-          localStorage.setItem("token", token);
-          localStorage.setItem("currentUser", JSON.stringify(newUser));
+          try {
+            localStorage.setItem("token", token);
+            localStorage.setItem("currentUser", JSON.stringify(newUser));
+          } catch {}
           showNotification(res.data.message || "Registration successful", "success");
           await initializeData();
           return { ok: true, user: newUser };
@@ -366,10 +385,7 @@ export const AppProvider = ({ children }) => {
     async (token, newPassword) => {
       try {
         setIsLoading(true);
-        const res = await axios.post(`${API_BASE}/users/reset-password`, {
-          token,
-          password: newPassword,
-        });
+        const res = await axios.post(`${API_BASE}/users/reset-password`, { token, password: newPassword });
         showNotification(res.data?.message || "Password reset successful", "success");
         setActiveSection("login");
         return true;
@@ -384,9 +400,9 @@ export const AppProvider = ({ children }) => {
     [API_BASE, showErrors, showNotification]
   );
 
-  /* ---------------------------
-     Booking functions
-     --------------------------- */
+  /* -----------------------
+     Booking
+     ----------------------- */
   const bookTest = useCallback((test) => {
     setCurrentTest(test);
   }, []);
@@ -404,7 +420,7 @@ export const AppProvider = ({ children }) => {
           patientId: currentUser.id,
         });
         const created = camelizeObject(res.data || {});
-        // refresh appointments (best effort)
+        // refresh appointments best-effort
         try {
           const apptsRes = await axios.get(`${API_BASE}/appointments/my`);
           setAppointments(camelizeObject(apptsRes.data || []));
@@ -412,7 +428,7 @@ export const AppProvider = ({ children }) => {
           setAppointments((prev) => [created, ...(prev || [])]);
         }
         setCurrentTest(null);
-        showNotification(created?.reference ? `Booking confirmed — reference: ${created.reference}` : "Booking confirmed successfully!", "success");
+        showNotification(created?.reference ? `Booking confirmed — reference: ${created.reference}` : "Booking confirmed!", "success");
         return created;
       } catch (err) {
         console.error("confirmBooking error", err);
@@ -425,15 +441,13 @@ export const AppProvider = ({ children }) => {
     [API_BASE, currentUser, showNotification]
   );
 
-  /* ---------------------------
-     Medical test / Hospital / Admin functions
-     (admin endpoints use /admin prefix; adjust if your backend differs)
-     --------------------------- */
+  /* -----------------------
+     Admin / Tests / Hospitals
+     ----------------------- */
   const createMedicalTest = useCallback(
     async (payload) => {
       try {
         const res = await axios.post(`${API_BASE}/admin/medical-test`, payload);
-        // Normalize response shapes: some backends return { test }, others return the created object directly
         const raw = res.data?.test ?? res.data?.data ?? res.data ?? null;
         const created = camelizeObject(raw);
         setMedicalTests((prev) => [created, ...(prev || [])]);
@@ -441,9 +455,6 @@ export const AppProvider = ({ children }) => {
         return created;
       } catch (err) {
         console.error("createMedicalTest error", err);
-        // Log backend response for debugging
-        // eslint-disable-next-line no-console
-        console.debug('createMedicalTest response error:', err?.response?.data || err?.message || err);
         showErrors(err.response?.data?.message || "Error creating test");
         throw err;
       }
@@ -495,8 +506,6 @@ export const AppProvider = ({ children }) => {
         return created;
       } catch (err) {
         console.error("createHospital error", err);
-        // eslint-disable-next-line no-console
-        console.debug('createHospital response error:', err?.response?.data || err?.message || err);
         showErrors(err.response?.data?.message || "Error creating hospital");
         throw err;
       }
@@ -588,9 +597,9 @@ export const AppProvider = ({ children }) => {
     [API_BASE, showErrors, showNotification]
   );
 
-  /* ---------------------------
-     Exposed context value
-     --------------------------- */
+  /* -----------------------
+     Expose context value
+     ----------------------- */
   const value = {
     // state
     currentUser,
@@ -616,18 +625,18 @@ export const AppProvider = ({ children }) => {
     setCurrentResultDraft,
     setCurrentTest,
 
-    // auth
+    // Auth
     login,
     logout,
     register,
     forgotPassword,
     resetPassword,
 
-    // booking
+    // Booking
     bookTest,
     confirmBooking,
 
-    // admin / tests / hospitals
+    // Admin / tests / hospitals
     createMedicalTest,
     updateMedicalTest,
     deleteMedicalTest,
