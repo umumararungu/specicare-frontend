@@ -20,6 +20,7 @@ export default function AdminSection() {
     appointments = [],
     allAppointments = [],
     allUsers = [],
+    currentUser,
     fetchAdminData,
     createMedicalTest,
     updateMedicalTest,
@@ -228,7 +229,28 @@ const safeUsers = useMemo(() => allUsers || [], [allUsers]);
 
   const handleSaveResult = async (formData) => {
     try {
-      await createTestResult(formData);
+      let payload = formData;
+
+      // If the modal sent FormData (file upload), append required ids to it
+      if (typeof FormData !== "undefined" && formData instanceof FormData) {
+        if (selectedAppointment?.id) payload.append("appointment_id", selectedAppointment.id);
+        if (!formData.get("test_id") && (selectedAppointment?.test_id || selectedAppointment?.testId)) payload.append("test_id", selectedAppointment.test_id || selectedAppointment.testId);
+        if (!formData.get("patient_id") && (selectedAppointment?.patient_id || selectedAppointment?.user_id)) payload.append("patient_id", selectedAppointment.patient_id || selectedAppointment.user_id);
+        if (!formData.get("hospital_id") && (selectedAppointment?.hospital_id || currentUser?.hospital_id)) payload.append("hospital_id", selectedAppointment.hospital_id || currentUser?.hospital_id);
+      } else {
+        // plain object payload: ensure required snake_case ids are present
+        payload = {
+          ...(formData || {}),
+          appointment_id: selectedAppointment?.id,
+          test_id: formData?.test_id || selectedAppointment?.test_id || selectedAppointment?.testId,
+          patient_id: selectedAppointment?.patient_id || selectedAppointment?.user_id,
+          hospital_id: selectedAppointment?.hospital_id || currentUser?.hospital_id,
+        };
+      }
+
+      console.log("Creating test result with payload:", payload); // Debug log
+
+      await createTestResult(payload);
       showNotification("Test result created", "success");
       setResultModalOpen(false);
       setSelectedAppointment(null);
@@ -238,6 +260,38 @@ const safeUsers = useMemo(() => allUsers || [], [allUsers]);
       showNotification("Failed to create result", "error");
     }
   };
+
+  // normalize appointment shapes so result form always gets the expected ids
+  const normalizeAppointment = useCallback((a) => {
+    if (!a) return a;
+    const id = a.id || a.appointment_id || null;
+
+    const test_id =
+      a.test_id ??
+      a.test?.id ??
+      a.medicalTest?.id ??
+      a.medical_test?.id ??
+      a.testId ??
+      a.medicalTestId ??
+      null;
+
+    const patient_id =
+      a.patient_id ??
+      a.patient?.id ??
+      a.user?.id ??
+      a.patientId ??
+      a.userId ??
+      null;
+
+    const hospital_id =
+      a.hospital_id ??
+      a.hospital?.id ??
+      a.hospitalId ??
+      (a.test && (a.test.hospital_id ?? a.test.hospitalId ?? a.test.hospital?.id)) ??
+      null;
+
+    return { ...a, id, test_id, patient_id, hospital_id };
+  }, []);
 
   /* ---------------------------------------------
       PAGINATION UI
@@ -564,17 +618,17 @@ const safeUsers = useMemo(() => allUsers || [], [allUsers]);
                         Confirm
                       </button>
 
-                      <button
-                        className="secondary-btn"
-                        onClick={() =>
-                          handleUpdateAppointmentStatus(
-                            appointment.id,
-                            "completed"
-                          )
-                        }
-                      >
-                        Complete
-                      </button>
+                    <button
+                      className="secondary-btn"
+                      onClick={() => {
+                        // instead of marking completed immediately, open result modal
+                        // and prefill required ids for the result form
+                        setSelectedAppointment(normalizeAppointment(appointment));
+                        setResultModalOpen(true);
+                      }}
+                    >
+                      Complete
+                    </button>
 
                       <button
                         className="warning-btn"
@@ -591,7 +645,7 @@ const safeUsers = useMemo(() => allUsers || [], [allUsers]);
                       <button
                         className="cta-button"
                         onClick={() => {
-                          setSelectedAppointment(appointment);
+                          setSelectedAppointment(normalizeAppointment(appointment));
                           setResultModalOpen(true);
                         }}
                       >
@@ -746,6 +800,7 @@ const safeUsers = useMemo(() => allUsers || [], [allUsers]);
             setSelectedAppointment(null);
           }}
           appointment={selectedAppointment}
+          selectedAppointment={selectedAppointment}
           onSubmit={handleSaveResult}
         />
       )}

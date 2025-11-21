@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-export default function CreateResultModal({ isOpen, onClose, onSubmit, appointment }) {
+export default function CreateResultModal({ isOpen, onClose, onSubmit, appointment, selectedAppointment }) {
   const [form, setForm] = useState({
     numeric_value: "",
     text_results: "",
@@ -46,6 +46,42 @@ export default function CreateResultModal({ isOpen, onClose, onSubmit, appointme
     setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
   };
 
+  // derive readable names from appointment shapes, falling back to selectedAppointment
+  const resolve = (keys, src = {}) => {
+    for (const k of keys) {
+      const v = src[k];
+      if (v !== undefined && v !== null) return v;
+    }
+    return undefined;
+  };
+
+  const source = appointment || selectedAppointment || {};
+  const toDisplay = (v) => {
+    if (v === undefined || v === null) return undefined;
+    if (typeof v === "string") return v;
+    if (typeof v === "number" || typeof v === "boolean") return String(v);
+    if (typeof v === "object") {
+      if (v.name) return v.name;
+      if (v.fullName) return v.fullName;
+      if (v.email) return v.email;
+      try {
+        return JSON.stringify(v);
+      } catch (e) {
+        return String(v);
+      }
+    }
+    return String(v);
+  };
+
+  const rawPatient = resolve(['patientName','patient_name','userName','patient','user'], source) || (source.patient || source.user);
+  const patientName = toDisplay(rawPatient) || '—';
+
+  const rawTest = resolve(['medicalTestName','medical_test_name','testName','test'], source) || (source.medicalTest || source.test);
+  const testName = toDisplay(rawTest) || '—';
+
+  const rawHospital = resolve(['hospitalName','hospital_name','hospital'], source) || source.hospital;
+  const hospitalName = toDisplay(rawHospital) || '—';
+
   const handleFile = (e) => {
     setFiles(Array.from(e.target.files));
   };
@@ -53,10 +89,26 @@ export default function CreateResultModal({ isOpen, onClose, onSubmit, appointme
   const handleSubmit = () => {
     const data = new FormData();
 
-    data.append("appointment_id", appointment.id);
-    data.append("test_id", appointment.test_id);
-    data.append("patient_id", appointment.patient_id);
-    data.append("hospital_id", appointment.hospital_id);
+    // resolve ids from appointment or selectedAppointment (allow multiple shapes)
+    const appointmentId = appointment?.id ?? selectedAppointment?.id ?? appointment?.appointment_id ?? selectedAppointment?.appointment_id ?? null;
+    const testId = appointment?.test_id ?? appointment?.testId ?? appointment?.test?.id ?? selectedAppointment?.test_id ?? selectedAppointment?.testId ?? selectedAppointment?.test?.id ?? null;
+    const patientId = appointment?.patient_id ?? appointment?.user_id ?? appointment?.patient?.id ?? selectedAppointment?.patient_id ?? selectedAppointment?.user_id ?? selectedAppointment?.patient?.id ?? null;
+    const hospitalId = appointment?.hospital_id ?? appointment?.hospital?.id ?? appointment?.hospitalId ?? selectedAppointment?.hospital_id ?? selectedAppointment?.hospital?.id ?? selectedAppointment?.hospitalId ?? null;
+
+  // Debug: Check if any are null
+  console.log('Resolved IDs:', { appointmentId, testId, patientId, hospitalId });
+  
+  if (!appointmentId || !testId || !patientId || !hospitalId) {
+    alert('Missing required appointment data. Please check the appointment details.');
+    console.error('Missing IDs - cannot submit');
+    return;
+  }
+
+  // CHANGE TO CAMELCASE - backend expects these names
+  data.append("appointmentId", appointmentId);  // Changed from appointment_id
+  data.append("testId", testId);                // Changed from test_id
+  data.append("patientId", patientId);          // Changed from patient_id
+  data.append("hospitalId", hospitalId);        // Changed from hospital_id
 
     data.append("numeric_value", form.numeric_value);
     data.append("text_results", form.text_results);
@@ -64,6 +116,21 @@ export default function CreateResultModal({ isOpen, onClose, onSubmit, appointme
     data.append("status", form.status);
 
     files.forEach((f) => data.append("files", f));
+
+    // Debug: enumerate FormData so we can inspect what is actually being sent
+    try {
+      // create a simple object representation for console readability
+      const entries = {};
+      for (const [k, v] of data.entries()) {
+        // for files, just note filename
+        if (v instanceof File) entries[k] = v.name;
+        else entries[k] = v;
+      }
+      // eslint-disable-next-line no-console
+      console.debug("CreateResultModal FormData entries:", entries);
+    } catch (e) {
+      // ignore debug failures
+    }
 
     onSubmit(data);
   };
@@ -73,6 +140,10 @@ export default function CreateResultModal({ isOpen, onClose, onSubmit, appointme
       <div className="modal-content show">
         <span className="close" onClick={onClose} style={{ cursor: 'pointer' }}>&times;</span>
         <h2>Create Test Result</h2>
+
+        <p><strong>Patient:</strong> {patientName}</p>
+        <p><strong>Test:</strong> {testName}</p>
+        <p><strong>Hospital:</strong> {hospitalName}</p>
 
         <input
           name="numeric_value"

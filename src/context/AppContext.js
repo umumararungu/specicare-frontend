@@ -159,6 +159,18 @@ export const AppProvider = ({ children }) => {
     }
   }, [API_BASE]);
 
+  const fetchTestResults = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/test-results/my`);
+      const data = res.data?.results ?? res.data ?? [];
+      setTestResults(camelizeObject(data || []));
+      return data;
+    } catch (err) {
+      console.error("fetchTestResults error", err);
+      return [];
+    }
+  }, [API_BASE]);
+
   const fetchHospitals = useCallback(async () => {
     try {
       const res = await axios.get(`${API_BASE}/hospitals`);
@@ -205,6 +217,9 @@ export const AppProvider = ({ children }) => {
       setHospitals(camelizeObject(hospitalsRes.data?.hospitals || []));
       setAppointments(camelizeObject(apptsRes.data || []));
 
+      // fetch user's test results as well
+      await fetchTestResults();
+
       if (mergedUser?.role === "admin") {
         await fetchAdminData();
       }
@@ -223,7 +238,7 @@ export const AppProvider = ({ children }) => {
       setIsLoading(false);
       isInitializing.current = false;
     }
-  }, [API_BASE, currentUser?.token, fetchAdminData, fetchNotifications]);
+  }, [API_BASE, currentUser?.token, fetchAdminData, fetchNotifications, fetchTestResults]);
 
   // run once on mount to pick up any token in localStorage
   useEffect(() => {
@@ -415,9 +430,10 @@ useSocket(
       }
       try {
         setIsLoading(true);
+        // backend expects snake_case keys; ensure patient_id is provided
         const res = await axios.post(`${API_BASE}/appointments`, {
           ...bookingData,
-          patientId: currentUser.id,
+          patient_id: currentUser.id,
         });
         const created = camelizeObject(res.data || {});
         // refresh appointments best-effort
@@ -567,7 +583,18 @@ useSocket(
   const createTestResult = useCallback(
     async (payload) => {
       try {
-        const res = await axios.post(`${API_BASE}/admin/test-results`, payload);
+        let res;
+
+        // If payload is FormData (file upload), send as multipart/form-data
+        if (typeof FormData !== "undefined" && payload instanceof FormData) {
+          // When sending FormData, explicitly set multipart/form-data so axios/browser include boundary
+          res = await axios.post(`${API_BASE}/test-results`, payload, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+        } else {
+          res = await axios.post(`${API_BASE}/test-results`, payload);
+        }
+
         const created = camelizeObject(res.data);
         setTestResults((prev) => [created, ...(prev || [])]);
         showNotification("Test result created successfully", "success");
@@ -650,6 +677,7 @@ useSocket(
     // misc
     fetchHospitals,
     fetchAdminData,
+    fetchTestResults,
     fetchNotifications,
     showNotification,
     showErrors,

@@ -16,11 +16,19 @@ export default function AddTestModal({ isOpen, onClose, hospitals = [], onSubmit
 
   useEffect(() => {
     if (edit) {
+      // try multiple possible shapes for the hospital id
+      const candidateHospitalId =
+        edit.hospital_id ??
+        edit.hospitalId ??
+        (edit.hospital && (edit.hospital.id ?? edit.hospital.hospital_id ?? edit.hospital.hospitalId)) ??
+        "";
+
       setForm({
         name: edit.name || "",
         description: edit.description || "",
         category: edit.category || "",
-        hospital_id: edit.hospital_id || "",
+        // store as string to match select option values
+        hospital_id: candidateHospitalId != null && candidateHospitalId !== "" ? String(candidateHospitalId) : "",
         price: edit.price ?? "",
         duration: edit.duration || "",
         preparation_instructions: edit.preparation_instructions || "",
