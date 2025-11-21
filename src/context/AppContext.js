@@ -183,6 +183,20 @@ export const AppProvider = ({ children }) => {
     }
   }, [API_BASE, showErrors]);
 
+  // Public data fetcher - used to populate lists for anonymous users
+  const fetchPublicData = useCallback(async () => {
+    try {
+      const [testsRes, hospitalsRes] = await Promise.all([
+        axios.get(`${API_BASE}/medical-test`),
+        axios.get(`${API_BASE}/hospitals`),
+      ]);
+      setMedicalTests(camelizeObject(testsRes.data || []));
+      setHospitals(camelizeObject(hospitalsRes.data?.hospitals || []));
+    } catch (err) {
+      console.error("fetchPublicData error", err);
+    }
+  }, [API_BASE]);
+
   /* -----------------------
      initializeData (guarded)
      - token is read from currentUser.token OR localStorage token
@@ -242,6 +256,10 @@ export const AppProvider = ({ children }) => {
 
   // run once on mount to pick up any token in localStorage
   useEffect(() => {
+    // Always fetch public lists (medical tests + hospitals) so unauthenticated
+    // users can browse available tests before logging in.
+    fetchPublicData();
+    // initializeData will return early if no token is present.
     initializeData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // initializeData guards token itself
@@ -595,7 +613,37 @@ useSocket(
           res = await axios.post(`${API_BASE}/test-results`, payload);
         }
 
-        const created = camelizeObject(res.data);
+        // server may return result under different keys; try common shapes
+        const raw = res.data?.testResult ?? res.data?.result ?? res.data?.data ?? res.data;
+        const created = camelizeObject(raw || {});
+
+        // Normalize attached files so each has a `url` field usable by the UI
+        const normalizeFile = (f) => {
+          if (!f) return null;
+          // already has url
+          if (f.url) return f;
+          if (f.fileUrl) return { ...f, url: f.fileUrl };
+          if (f.path) {
+            const u = String(f.path);
+            return { ...f, url: u.startsWith("/") ? `${rawUrl}${u}` : u };
+          }
+          if (f.filePath) {
+            const u = String(f.filePath);
+            return { ...f, url: u.startsWith("/") ? `${rawUrl}${u}` : u };
+          }
+          if (f.filename) {
+            const u = String(f.filename);
+            return { ...f, url: u.startsWith("/") ? `${rawUrl}${u}` : u };
+          }
+          // s3 style
+          if (f.location) return { ...f, url: f.location };
+          return f;
+        };
+
+        if (Array.isArray(created.files)) {
+          created.files = created.files.map(normalizeFile).filter(Boolean);
+        }
+
         setTestResults((prev) => [created, ...(prev || [])]);
         showNotification("Test result created successfully", "success");
         return created;
@@ -605,7 +653,7 @@ useSocket(
         throw err;
       }
     },
-    [API_BASE, showErrors, showNotification]
+    [API_BASE, showErrors, showNotification, rawUrl]
   );
 
   const deleteUser = useCallback(
