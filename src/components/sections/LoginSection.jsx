@@ -75,7 +75,14 @@ const LoginSection = () => {
     //   return;
     // }
 
-    // Prepare data for backend 
+    // Prepare data for backend
+    // Normalize address fields and also include flat fields to support APIs
+    // that expect top-level district/sector/cell/village keys.
+    const district = registerData.address?.district?.toString().trim() || '';
+    const sector = registerData.address?.sector?.toString().trim() || '';
+    const cell = registerData.address?.cell?.toString().trim() || '';
+    const village = registerData.address?.village?.toString().trim() || '';
+
     const userData = {
       name: registerData.name.trim(),
       email: registerData.email.trim().toLowerCase(),
@@ -84,12 +91,13 @@ const LoginSection = () => {
       insuranceNumber: registerData.insuranceNumber.trim() || undefined,
       dateOfBirth: registerData.dateOfBirth || undefined,
       gender: registerData.gender || undefined,
-      address: registerData.address.district ? {
-        district: registerData.address.district,
-        sector: registerData.address.sector,
-        cell: registerData.address.cell.trim(),
-        village: registerData.address.village.trim()
-      } : undefined,
+      // include nested address when district is provided
+      address: district ? { district, sector, cell, village } : undefined,
+      // also include flat fields (some backends expect these directly)
+      district: district || undefined,
+      sector: sector || undefined,
+      cell: cell || undefined,
+      village: village || undefined,
       role: 'patient', // Default role as per schema
       isActive: true   // Default as per schema
     };
