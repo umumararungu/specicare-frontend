@@ -85,8 +85,10 @@ export function getSectors(district) {
   return DISTRICT_SECTORS[district] || [];
 }
 
-export default {
+const Locations = {
   DISTRICT_SECTORS,
   DISTRICTS,
   getSectors
 };
+
+export default Locations;
