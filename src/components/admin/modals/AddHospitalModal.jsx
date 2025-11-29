@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useApp } from "../../../context/AppContext";
+import { DISTRICTS, getSectors } from '../../../utils/locations';
 
 export default function AddHospitalModal({ isOpen, onClose, onSubmit, edit }) {
   const [form, setForm] = useState({
@@ -18,7 +19,7 @@ export default function AddHospitalModal({ isOpen, onClose, onSubmit, edit }) {
     longitude: "",
     operating_hours: "",
     facilities: "",
-    insurance_providers: ""
+    insurance_providers: []
   });
 
   useEffect(() => {
@@ -39,7 +40,22 @@ export default function AddHospitalModal({ isOpen, onClose, onSubmit, edit }) {
         longitude: edit.longitude ?? "",
         operating_hours: edit.operating_hours ? JSON.stringify(edit.operating_hours, null, 2) : "",
         facilities: edit.facilities ? JSON.stringify(edit.facilities, null, 2) : "",
-        insurance_providers: edit.insurance_providers ? JSON.stringify(edit.insurance_providers, null, 2) : "",
+        insurance_providers: edit.insurance_providers
+          ? (Array.isArray(edit.insurance_providers)
+              ? edit.insurance_providers
+              : (typeof edit.insurance_providers === 'string'
+                  ? (() => {
+                      try {
+                        return JSON.parse(edit.insurance_providers);
+                      } catch (e) {
+                        return edit.insurance_providers
+                          .split(/\r?\n|,/) // split by newlines or commas
+                          .map(s => s.trim())
+                          .filter(Boolean);
+                      }
+                    })()
+                  : []))
+          : [],
       });
     }
   }, [edit]);
@@ -77,6 +93,22 @@ export default function AddHospitalModal({ isOpen, onClose, onSubmit, edit }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    // Reset sector and cell when district changes
+    if (name === 'district') {
+      setForm((p) => ({ ...p, district: value, sector: '', cell: '' }));
+      return;
+    }
+    // Reset cell when sector changes
+    if (name === 'sector') {
+      setForm((p) => ({ ...p, sector: value, cell: '' }));
+      return;
+    }
+    // multi-select insurance_providers (selectedOptions -> array)
+    if (name === 'insurance_providers') {
+      const selected = Array.from(e.target.selectedOptions || []).map((o) => o.value);
+      setForm((p) => ({ ...p, insurance_providers: selected }));
+      return;
+    }
     setForm((p) => ({ ...p, [name]: value }));
   };
 
@@ -138,7 +170,9 @@ export default function AddHospitalModal({ isOpen, onClose, onSubmit, edit }) {
         ...form,
         operating_hours: safeJsonParse(form.operating_hours, "Operating Hours"),
         facilities: safeJsonParse(form.facilities, "Facilities"),
-        insurance_providers: safeJsonParse(form.insurance_providers, "Insurance Providers"),
+        insurance_providers: Array.isArray(form.insurance_providers)
+          ? form.insurance_providers
+          : safeJsonParse(form.insurance_providers, "Insurance Providers"),
       };
 
       let created = null;
@@ -180,14 +214,34 @@ export default function AddHospitalModal({ isOpen, onClose, onSubmit, edit }) {
         <input name="emergency_phone" placeholder="Emergency Phone" value={form.emergency_phone} onChange={handleChange} />
 
         <input name="province" placeholder="Province" value={form.province} onChange={handleChange} />
-        <input name="district" placeholder="District" value={form.district} onChange={handleChange} />
-        <input name="sector" placeholder="Sector" value={form.sector} onChange={handleChange} />
-        <input name="cell" placeholder="Cell" value={form.cell} onChange={handleChange} />
-        <input name="village" placeholder="Village" value={form.village} onChange={handleChange} />
+
+        <select name="district" value={form.district} onChange={handleChange}>
+          <option value="">District</option>
+          {DISTRICTS.map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+
+        {(() => {
+          const sectors = getSectors(form.district || '');
+          if (sectors && sectors.length > 0) {
+            return (
+              <select name="sector" value={form.sector} onChange={handleChange}>
+                <option value="">Sector</option>
+                {sectors.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            );
+          }
+
+          return (
+            <input name="sector" placeholder="Sector" value={form.sector} onChange={handleChange} />
+          );
+        })()}
+
         <input name="street" placeholder="Street" value={form.street} onChange={handleChange} />
 
-        <input name="latitude" placeholder="Latitude" value={form.latitude} onChange={handleChange} />
-        <input name="longitude" placeholder="Longitude" value={form.longitude} onChange={handleChange} />
 
         <textarea
           name="operating_hours"
@@ -205,13 +259,25 @@ export default function AddHospitalModal({ isOpen, onClose, onSubmit, edit }) {
           rows={3}
         />
 
-        <textarea
-          name="insurance_providers"
-          placeholder='Insurance Providers (JSON) - e.g., ["RAMA", "MMI", "RSSB"]'
-          value={form.insurance_providers}
-          onChange={handleChange}
-          rows={3}
-        />
+        <div className="form-group">
+          <label htmlFor="insurance_providers">Insurance Providers</label>
+          <select
+            id="insurance_providers"
+            name="insurance_providers"
+            multiple
+            value={form.insurance_providers}
+            onChange={handleChange}
+          >
+            <option value="RAMA">RAMA</option>
+            <option value="MMI">MMI</option>
+            <option value="RSSB">RSSB</option>
+            <option value="EDEN">EDEN</option>
+            <option value="BRITAM">BRITAM</option>
+            <option value="RADIANT">RADIANT</option>
+            <option value="PRIME">PRIME</option>
+          </select>
+          <small className="form-help">Hold Ctrl (Cmd on macOS) to select multiple</small>
+        </div>
 
         <div className="modal-actions">
           <button onClick={handleSubmit}>{edit ? 'Save Changes' : 'Create Hospital'}</button>

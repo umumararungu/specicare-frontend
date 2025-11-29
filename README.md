@@ -1,70 +1,126 @@
-# Getting Started with Create React App
+# Specicare — Frontend (React)
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This repository contains the frontend for the Specicare application — a React single-page app bootstrapped with Create React App. This document explains how to set up, run, build, and deploy the project locally.
 
-## Available Scripts
+**Prerequisites**
 
-In the project directory, you can run:
+- **Node.js**: 16.x or later recommended. Verify with `node --version`.
+- **npm**: comes with Node.js. Verify with `npm --version`.
+- (Optional) Git to clone the repository.
 
-### `npm start`
+**Quick Start — Development**
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+1. Clone the repo (if you haven't already):
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+```powershell
+git clone https://github.com/umumararungu/specicare-frontend.git
+cd specicare-frontend
+```
 
-### `npm test`
+2. Install dependencies:
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+```powershell
+npm install
+```
 
-### `npm run build`
+3. Start the development server:
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```powershell
+npm start
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Open your browser at `http://localhost:3000`. The dev server supports hot reload — edits will refresh the page.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+**Available npm scripts**
 
-### `npm run eject`
+- `npm start` : Runs the app in development mode.
+- `npm test` : Runs tests (Create React App test runner).
+- `npm run build` : Builds production files into the `build/` folder.
+- `npm run eject` : Ejects the app (one-way operation).
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+(These scripts are defined in `package.json`.)
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+**Environment variables**
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+This project uses Create React App conventions for environment variables. Prefix any custom variables with `REACT_APP_`.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+Create a `.env` file in the project root for local overrides. Example variables you may need:
 
-## Learn More
+```text
+REACT_APP_API_URL=https://api.example.com
+REACT_APP_SOCKET_URL=wss://sockets.example.com
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+Adjust names/values to match the backend this frontend connects to. If your backend requires authentication or other keys, keep secrets out of source control and use a secure secrets manager for production.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+**Build (Production)**
 
-### Code Splitting
+To create an optimized production build:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+```powershell
+npm run build
+```
 
-### Analyzing the Bundle Size
+The output is written to the `build/` directory and is ready to be deployed to a static hosting service (Netlify, Vercel, S3 + CloudFront, Azure Static Web Apps, etc.).
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+To preview the production build locally, you can use a simple static server. Example using `serve`:
 
-### Making a Progressive Web App
+```powershell
+npx serve -s build -l 5000
+# or
+npx http-server ./build -p 5000
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+Then open `http://localhost:5000` to preview.
 
-### Advanced Configuration
+**Tests and Linting**
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+- Run tests:
 
-### Deployment
+```powershell
+npm test
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+- This repo does not include an explicit lint script by default. If you add ESLint configuration, you can add a `lint` script to `package.json` (e.g. `eslint 'src/**'`).
 
-### `npm run build` fails to minify
+**Project Structure (key files & folders)**
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- `public/` — static HTML and manifest files.
+- `build/` — production build output (generated by `npm run build`).
+- `src/` — application source code
+	- `App.js` — main app component
+	- `index.js` — React entry point
+	- `components/` — UI components
+		- `admin/` — admin-specific components and modals
+		- `common/` — shared components (Header, Footer, Notification, etc.)
+		- `sections/` — page/route sections (Home, Dashboard, Login, etc.)
+	- `context/` — React Context (`AppContext.js`)
+	- `hooks/` — custom hooks (`useSocket.js`)
+	- `utils/` — small utilities (`safe.js`)
+
+Use these as the starting points when adding features or debugging.
+
+**Connecting to the Backend**
+
+This frontend expects to talk to a backend API and (optionally) a sockets server. Set `REACT_APP_API_URL` and `REACT_APP_SOCKET_URL` in your `.env` or environment so the axios/socket client code can connect correctly.
+
+Search for usages of `axios` and `socket.io-client` in `src/` to find where to adapt endpoints.
+
+**Deployment notes**
+
+- The `build/` folder is static and suitable for deployment to any static hosting.
+- If deploying to a host that supports environment variables (Vercel, Netlify, Azure), configure runtime variables there.
+- For single-page-app routing, configure the host to redirect unknown routes to `index.html` (Netlify `_redirects`, Vercel settings, or server rewrite rules).
+
+**Troubleshooting**
+
+- If the app shows a blank page after deployment, check that API endpoints are reachable and CORS is allowed.
+- If hot reload doesn't reflect changes, stop and restart the dev server after clearing caches.
+- Use browser DevTools console/network tab to inspect errors and failed network requests.
+
+**Contributing**
+
+- Fork the repo and open a pull request with a clear description of your changes.
+- Keep changes focused and add tests where appropriate.
+
+

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { DISTRICTS, getSectors } from '../../utils/locations';
 
 const LoginSection = () => {
   const { login, register, isLoading, showNotification, setActiveSection } = useApp();
@@ -18,7 +19,7 @@ const LoginSection = () => {
     phone: '',
     password: '',
     confirmPassword: '',
-    insuranceNumber: '',
+    insuranceProvider: '',
     dateOfBirth: '',
     gender: '',
     address: {
@@ -88,7 +89,7 @@ const LoginSection = () => {
       email: registerData.email.trim().toLowerCase(),
       phone: formatPhoneNumber(registerData.phone),
       password: registerData.password,
-      insuranceNumber: registerData.insuranceNumber.trim() || undefined,
+      insuranceProvider: registerData.insuranceProvider || undefined,
       dateOfBirth: registerData.dateOfBirth || undefined,
       gender: registerData.gender || undefined,
       // include nested address when district is provided
@@ -180,7 +181,19 @@ const LoginSection = () => {
       address: {
         ...prev.address,
         district: district,
-        sector: '' // Reset sector when district changes
+        sector: '', // Reset sector when district changes
+        cell: ''
+      }
+    }));
+  };
+
+  const handleSectorChange = (sector) => {
+    setRegisterData(prev => ({
+      ...prev,
+      address: {
+        ...prev.address,
+        sector: sector,
+        cell: '' // reset cell when sector changes
       }
     }));
   };
@@ -219,7 +232,7 @@ const LoginSection = () => {
               </div>
               <button type="submit" className="submit-btn" disabled={isLoading}>
                 <i className="fas fa-sign-in-alt"></i> 
-                {isLoading ? 'Signing In...' : 'Sign In'}
+                {isLoading ? '  Signing In...' : 'Sign In'}
               </button>
             </form>
 
@@ -252,221 +265,194 @@ const LoginSection = () => {
             <h2>Create Account</h2>
             <p>Join SpeciCare to book medical tests</p>
             
-            <form id="registerForm" onSubmit={handleRegisterSubmit}>
-              {/* Personal Information Section */}
-              <div className="form-section">
-                <h4>Personal Information</h4>
-                
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="registerName" className="required">Full Name</label>
-                    <input 
-                      type="text" 
-                      id="registerName" 
-                      required 
-                      placeholder="Enter your full name"
-                      value={registerData.name}
-                      onChange={(e) => handleRegisterChange('name', e.target.value)}
-                      maxLength="100"
-                    />
-                    <small className="form-help">Maximum 100 characters</small>
-                  </div>
-                </div>
+                <form id="registerForm" onSubmit={handleRegisterSubmit}>
+                  <div className="register-grid">
+                    <div className="register-column">
+                      {/* Personal Information (left) */}
+                      <div className="form-section">
+                        <h4>Personal Information</h4>
+                        <div className="form-group">
+                          <label htmlFor="registerName" className="required">Full Name</label>
+                          <input
+                            type="text"
+                            id="registerName"
+                            required
+                            placeholder="Enter your full name"
+                            value={registerData.name}
+                            onChange={(e) => handleRegisterChange('name', e.target.value)}
+                            maxLength="100"
+                          />
+                          <small className="form-help">Maximum 100 characters</small>
+                        </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="registerEmail" className="required">Email Address</label>
-                    <input 
-                      type="email" 
-                      id="registerEmail" 
-                      required 
-                      placeholder="Enter your email"
-                      value={registerData.email}
-                      onChange={(e) => handleRegisterChange('email', e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="registerPhone" className="required">Phone Number</label>
-                    <input 
-                      type="tel" 
-                      id="registerPhone" 
-                      required 
-                      placeholder="e.g., 0788123456 or +250788123456"
-                      value={registerData.phone}
-                      onChange={(e) => handleRegisterChange('phone', e.target.value)}
-                      pattern="^(\+?250|0)?[72][0-9]{8}$"
-                    />
-                    <small className="form-help">Valid Rwandan number (07xxxxxxxx or +2507xxxxxxxx)</small>
-                  </div>
-                </div>
+                        <div className="form-row">
+                          <div className="form-group">
+                            <label htmlFor="registerEmail" className="required">Email Address</label>
+                            <input
+                              type="email"
+                              id="registerEmail"
+                              required
+                              placeholder="Enter your email"
+                              value={registerData.email}
+                              onChange={(e) => handleRegisterChange('email', e.target.value)}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label htmlFor="registerPhone" className="required">Phone Number</label>
+                            <input
+                              type="tel"
+                              id="registerPhone"
+                              required
+                              placeholder="e.g., 0788123456 or +250788123456"
+                              value={registerData.phone}
+                              onChange={(e) => handleRegisterChange('phone', e.target.value)}
+                              pattern="^(\+?250|0)?[72][0-9]{8}$"
+                            />
+                            <small className="form-help">Valid Rwandan number (07xxxxxxxx or +2507xxxxxxxx)</small>
+                          </div>
+                        </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="registerDateOfBirth">Date of Birth</label>
-                    <input 
-                      type="date" 
-                      id="registerDateOfBirth" 
-                      max={new Date().toISOString().split('T')[0]}
-                      value={registerData.dateOfBirth}
-                      onChange={(e) => handleRegisterChange('dateOfBirth', e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="registerGender">Gender</label>
-                    <select 
-                      id="registerGender"
-                      value={registerData.gender}
-                      onChange={(e) => handleRegisterChange('gender', e.target.value)}
-                    >
-                      <option value="">Select Gender</option>
-                      <option value="male">Male</option>
-                      <option value="female">Female</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
+                        <div className="form-row">
+                          <div className="form-group">
+                            <label htmlFor="registerDateOfBirth">Date of Birth</label>
+                            <input
+                              type="date"
+                              id="registerDateOfBirth"
+                              max={new Date().toISOString().split('T')[0]}
+                              value={registerData.dateOfBirth}
+                              onChange={(e) => handleRegisterChange('dateOfBirth', e.target.value)}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label htmlFor="registerGender">Gender</label>
+                            <select
+                              id="registerGender"
+                              value={registerData.gender}
+                              onChange={(e) => handleRegisterChange('gender', e.target.value)}
+                            >
+                              <option value="">Select Gender</option>
+                              <option value="male">Male</option>
+                              <option value="female">Female</option>
+                              <option value="other">Other</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
-              {/* Security Section */}
-              <div className="form-section">
-                <h4>Security</h4>
-                
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="registerPassword" className="required">Password</label>
-                    <input 
-                      type="password" 
-                      id="registerPassword" 
-                      required 
-                      placeholder="Create a password (min. 6 characters)"
-                      value={registerData.password}
-                      onChange={(e) => handleRegisterChange('password', e.target.value)}
-                      minLength="6"
-                    />
-                    <small className="form-help">Minimum 6 characters</small>
-                  </div>
-                </div>
+                    <div className="register-column">
+                      {/* Middle content moved into right column: address, sector, insurance, security */}
+                      <div className="form-section">
+                        <h4>Address Information</h4>
+                        <div className="form-row">
+                          <div className="form-group">
+                            <label htmlFor="registerDistrict">District</label>
+                            <select
+                              id="registerDistrict"
+                              value={registerData.address.district}
+                              onChange={(e) => handleDistrictChange(e.target.value)}
+                            >
+                              <option value="">Select District</option>
+                              {DISTRICTS.map((d) => (
+                                <option key={d} value={d}>{d}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="registerConfirmPassword" className="required">Confirm Password</label>
-                    <input 
-                      type="password" 
-                      id="registerConfirmPassword" 
-                      required 
-                      placeholder="Confirm your password"
-                      value={registerData.confirmPassword}
-                      onChange={(e) => handleRegisterChange('confirmPassword', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
+                      <div className="form-section">
+                        <h4>Sector</h4>
+                        <div className="form-group">
+                          {(() => {
+                            const sectors = getSectors(registerData.address.district || '');
+                            if (sectors && sectors.length > 0) {
+                              return (
+                                <select
+                                  id="registerSector"
+                                  value={registerData.address.sector}
+                                  onChange={(e) => handleSectorChange(e.target.value)}
+                                >
+                                  <option value="">Select Sector</option>
+                                  {sectors.map((s) => (
+                                    <option key={s} value={s}>{s}</option>
+                                  ))}
+                                </select>
+                              );
+                            }
 
-              {/* Insurance Information */}
-              <div className="form-section">
-                <h4>Insurance Information</h4>
-                
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="registerInsurance">Insurance Number (CBHI)</label>
-                    <input 
-                      type="text" 
-                      id="registerInsurance" 
-                      placeholder="Enter insurance number (optional)"
-                      value={registerData.insuranceNumber}
-                      onChange={(e) => handleRegisterChange('insuranceNumber', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
+                            return (
+                              <input
+                                type="text"
+                                id="registerSector"
+                                placeholder="Enter sector"
+                                value={registerData.address.sector}
+                                onChange={(e) => handleSectorChange(e.target.value)}
+                              />
+                            );
+                          })()}
+                        </div>
+                      </div>
 
-              {/* Address Information */}
-              <div className="form-section">
-                <h4>Address Information (Optional)</h4>
-                
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="registerDistrict">District</label>
-                    <select 
-                      id="registerDistrict"
-                      value={registerData.address.district}
-                      onChange={(e) => handleDistrictChange(e.target.value)}
-                    >
-                      <option value="">Select District</option>
-                      <option value="Gasabo">Gasabo</option>
-                      <option value="Kicukiro">Kicukiro</option>
-                      <option value="Nyarugenge">Nyarugenge</option>
-                      <option value="Bugesera">Bugesera</option>
-                      <option value="Gatsibo">Gatsibo</option>
-                      <option value="Kayonza">Kayonza</option>
-                      <option value="Kirehe">Kirehe</option>
-                      <option value="Ngoma">Ngoma</option>
-                      <option value="Nyagatare">Nyagatare</option>
-                      <option value="Rwamagana">Rwamagana</option>
+                      <div className="form-section">
+                        
+                        <div className="form-group">
+                          <label htmlFor="registerInsurance">Insurance Provider</label>
+                          <select
+                            id="registerInsurance"
+                            value={registerData.insuranceProvider}
+                            onChange={(e) => handleRegisterChange('insuranceProvider', e.target.value)}
+                          >
+                            <option value="">Select Provider</option>
+                            <option value="RAMA">RAMA</option>
+                            <option value="MMI">MMI</option>
+                            <option value="RSSB">RSSB</option>
+                            <option value="EDEN">EDEN</option>
+                            <option value="BRITAM">BRITAM</option>
+                            <option value="RADIANT">RADIANT</option>
+                            <option value="PRIME">PRIME</option>
+                            <option value="None">None</option>
+                          </select>
+                        </div>
+                      </div>
 
-                      <option value="Burera">Burera</option>
-                      <option value="Gakenke">Gakenke</option>
-                      <option value="Gicumbi">Gicumbi</option>
-                      <option value="Musanze">Musanze</option>
-                      <option value="Rulindo">Rulindo</option>
-                      <option value="Gisagara">Gisagara</option>
-                      <option value="Huye">Huye</option>
-                      <option value="Kamonyi">Kamonyi</option>
-                      <option value="Muhanga">Muhanga</option>
-                      <option value="Nyamagabe">Nyamagabe</option>
-                      
-                      <option value="Nyanza">Nyanza</option>
-                      <option value="Nyaruguru">Nyaruguru</option>
-                      <option value="Ruhango">Ruhango</option>
-                      <option value="Karongi">Karongi</option>
-                      <option value="Ngororero">Ngororero</option>
-                      <option value="Nyabihu">Nyabihu</option>
-                      <option value="Nyamasheke">Nyamasheke</option>
-                      <option value="Rubavu">Rubavu</option>
-                      <option value="Rusizi">Rusizi</option>
-                      <option value="Rutsiro">Rutsiro</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="registerSector">Sector</label>
-                    <input 
-                      type="text" 
-                      id="registerSector" 
-                      placeholder="Enter sector"
-                      value={registerData.address.sector}
-                      onChange={(e) => handleRegisterChange('address.sector', e.target.value)}
-                    />
-                  </div>
-                </div>
+                      <div className="form-section">
+                        
+                        <div className="form-group">
+                          <label htmlFor="registerPassword" className="required">Password</label>
+                          <input
+                            type="password"
+                            id="registerPassword"
+                            required
+                            placeholder="Create a password (min. 6 characters)"
+                            value={registerData.password}
+                            onChange={(e) => handleRegisterChange('password', e.target.value)}
+                            minLength="6"
+                          />
+                          <small className="form-help">Minimum 6 characters</small>
+                        </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="registerCell">Cell</label>
-                    <input 
-                      type="text" 
-                      id="registerCell" 
-                      placeholder="Enter cell"
-                      value={registerData.address.cell}
-                      onChange={(e) => handleRegisterChange('address.cell', e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="registerVillage">Village</label>
-                    <input 
-                      type="text" 
-                      id="registerVillage" 
-                      placeholder="Enter village"
-                      value={registerData.address.village}
-                      onChange={(e) => handleRegisterChange('address.village', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
+                        <div className="form-group">
+                          <label htmlFor="registerConfirmPassword" className="required">Confirm Password</label>
+                          <input
+                            type="password"
+                            id="registerConfirmPassword"
+                            required
+                            placeholder="Confirm your password"
+                            value={registerData.confirmPassword}
+                            onChange={(e) => handleRegisterChange('confirmPassword', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
 
-              <button type="submit" className="submit-btn" disabled={isLoading}>
-                <i className="fas fa-user-plus"></i> 
-                {isLoading ? 'Creating Account...' : 'Create Account'}
-              </button>
+                    <div className="register-actions">
+                      <button type="submit" className="submit-btn" disabled={isLoading}>
+                        <i className="fas fa-user-plus"></i>
+                        {isLoading ? 'Creating Account...' : 'Create Account'}
+                      </button>
+                    </div>
+                  </div>
             </form>
 
             <div className="login-divider">

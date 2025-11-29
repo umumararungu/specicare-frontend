@@ -211,10 +211,10 @@ const BookingModal = () => {
     return null;
   }
 
+
+
   const hospital = (hospitals || []).find((hospital) => {
-    // Support both snake_case and camelCase keys on the test
     const testHospitalId = currentTest?.hospitalId ?? currentTest?.hospital_id;
-    // Use strict comparison on normalized string values to satisfy lint rules
     return testHospitalId != null && hospital && String(hospital.id) === String(testHospitalId);
   });
 
@@ -276,15 +276,48 @@ const BookingModal = () => {
               onChange={(e) => handleChange("patientEmail", e.target.value)}
             />
           </div>
-          <div className="form-group">
-            <label>Insurance Number (CBHI)</label>
-            <input
-              type="text"
-              value={bookingData.insuranceNumber}
-              onChange={(e) => handleChange("insuranceNumber", e.target.value)}
-              placeholder="Enter if applicable"
-            />
-          </div>
+<div className="form-group">
+  <label>Insurance Provider</label>
+  <input
+    type="text"
+    value={
+      currentUser?.insurance?.number ||
+      currentUser?.insuranceNumber ||
+      currentUser?.insurance_number ||
+      "Not Provided"
+    }
+    readOnly
+  />
+</div>
+
+{(() => {
+  const providerName =
+    currentUser?.insurance?.number ||
+    currentUser?.insuranceNumber ||
+    currentUser?.insurance_number ||
+    null;
+
+  const hasInsurance = providerName;
+
+  const coPayValue = currentTest?.insurance_co_pay ?? currentTest?.insuranceCoPay ?? null;
+  const hasCoPay = coPayValue != null && Number.isFinite(Number(coPayValue));
+
+  const showCoPay = hasInsurance && hasCoPay;
+
+  return showCoPay ? (
+    <div className="form-group">
+      <label>Insurance Co-pay</label>
+      <input
+        type="text"
+        value={`${Number(coPayValue).toLocaleString()} RWF`}
+        readOnly
+      />
+      <small style={{ color: "#555" }}>
+        You will pay this amount, the rest is covered by your insurance.
+      </small>
+    </div>
+  ) : null;
+})()}
           <div className="form-group">
             <label>Preferred Date *</label>
             <DatePicker
