@@ -123,15 +123,12 @@ export default function AddHospitalModal({ isOpen, onClose, onSubmit, edit }) {
       try {
         return JSON.parse(trimmed);
       } catch (error) {
-        // fallthrough to forgiving parsing
         console.warn(`JSON.parse failed for ${fieldName}:`, error);
       }
     }
 
-    // Fallbacks: allow simple comma/newline-separated lists for array-like fields
     const fname = (fieldName || "").toLowerCase();
     if (fname.includes("facility") || fname.includes("insurance")) {
-      // split on newlines or commas and return array
       const parts = trimmed
         .split(/\r?\n|,/) // split by newline or comma
         .map((s) => s.trim())
