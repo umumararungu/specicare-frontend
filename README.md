@@ -1,69 +1,101 @@
+
 # Specicare — Frontend (React)
 
-This repository contains the frontend for the Specicare application — a React single-page app bootstrapped with Create React App. This document explains how to set up, run, build, and deploy the project locally.
+Frontend for the Specicare application. Built with Create React App (React 18).
 
-**Prerequisites**
+## Summary
 
-- **Node.js**: 16.x or later recommended. Verify with `node --version`.
-- **npm**: comes with Node.js. Verify with `npm --version`.
-- (Optional) Git to clone the repository.
+This repo contains the single-page React frontend. The README below explains how to install dependencies, run the app in development, build for production, run tests, and configure environment variables (including PowerShell notes for Windows).
 
-**Quick Start — Development**
+## Prerequisites
 
-1. Clone the repo (if you haven't already):
+- Node.js (LTS recommended). Use Node 16.x or 18.x for best compatibility. Verify with:
+
+```powershell
+node --version
+npm --version
+```
+
+- (Optional) `yarn` if you prefer Yarn: `npm install -g yarn`
+- Git to clone the repository
+
+## Quick start (development)
+
+1. Clone the repository and change into it:
 
 ```powershell
 git clone https://github.com/umumararungu/specicare-frontend.git
 cd specicare-frontend
 ```
 
-2. Install dependencies:
+2. Install dependencies (choose one):
 
 ```powershell
 npm install
+# or, for CI reproducible installs
+npm ci
+# or with yarn
+yarn install
 ```
 
 3. Start the development server:
 
 ```powershell
 npm start
+# or
+yarn start
 ```
 
-Open your browser at `http://localhost:3000`. The dev server supports hot reload — edits will refresh the page.
+Open http://localhost:3000 in your browser. The dev server supports hot reload.
 
-**Available npm scripts**
+## Environment variables
 
-- `npm start` : Runs the app in development mode.
-- `npm test` : Runs tests (Create React App test runner).
-- `npm run build` : Builds production files into the `build/` folder.
-- `npm run eject` : Ejects the app (one-way operation).
+This project uses Create React App conventions: variables must be prefixed with `REACT_APP_`.
 
-(These scripts are defined in `package.json`.)
-
-**Environment variables**
-
-This project uses Create React App conventions for environment variables. Prefix any custom variables with `REACT_APP_`.
-
-Create a `.env` file in the project root for local overrides. Example variables you may need:
+- Create a `.env` file in the project root to set local variables. Example `.env`:
 
 ```text
 REACT_APP_API_URL=https://api.example.com
 REACT_APP_SOCKET_URL=wss://sockets.example.com
 ```
 
-Adjust names/values to match the backend this frontend connects to. If your backend requires authentication or other keys, keep secrets out of source control and use a secure secrets manager for production.
+- PowerShell temporary variable (only for that terminal session):
 
-**Build (Production)**
+```powershell
+#$env:REACT_APP_API_URL = "https://api.example.com"
+$env:REACT_APP_API_URL = "http://localhost:5000"
+npm start
+```
 
-To create an optimized production build:
+- To set a persistent environment variable on Windows for the current user (PowerShell):
+
+```powershell
+setx REACT_APP_API_URL "https://api.example.com"
+# then open a new shell for it to take effect
+```
+
+Keep secrets out of source control. For production, configure environment variables in your hosting provider (Vercel, Netlify, Azure Static Web Apps, etc.).
+
+## NPM scripts
+
+Scripts defined in `package.json`:
+
+- `start` — `react-scripts start` (run dev server)
+- `build` — `react-scripts build` (create optimized production build in `build/`)
+- `test` — `react-scripts test` (run tests)
+- `eject` — `react-scripts eject` (one-way operation; only if you need full control)
+
+Use `npm run <script>` or `yarn <script>`.
+
+## Build & preview (production)
+
+Create a production build:
 
 ```powershell
 npm run build
 ```
 
-The output is written to the `build/` directory and is ready to be deployed to a static hosting service (Netlify, Vercel, S3 + CloudFront, Azure Static Web Apps, etc.).
-
-To preview the production build locally, you can use a simple static server. Example using `serve`:
+Preview the build locally using a static server (recommended):
 
 ```powershell
 npx serve -s build -l 5000
@@ -71,56 +103,76 @@ npx serve -s build -l 5000
 npx http-server ./build -p 5000
 ```
 
-Then open `http://localhost:5000` to preview.
+Open http://localhost:5000 to preview the production bundle.
 
-**Tests and Linting**
+## Tests
 
-- Run tests:
+Run tests with:
 
 ```powershell
 npm test
 ```
 
-- This repo does not include an explicit lint script by default. If you add ESLint configuration, you can add a `lint` script to `package.json` (e.g. `eslint 'src/**'`).
+By default Create React App runs tests in watch mode. For a single run (CI), use the appropriate environment flags (for example `CI=true npm test -- --watchAll=false`).
 
-**Project Structure (key files & folders)**
+## Key dependencies
 
-- `public/` — static HTML and manifest files.
-- `build/` — production build output (generated by `npm run build`).
-- `src/` — application source code
-	- `App.js` — main app component
-	- `index.js` — React entry point
-	- `components/` — UI components
-		- `admin/` — admin-specific components and modals
-		- `common/` — shared components (Header, Footer, Notification, etc.)
-		- `sections/` — page/route sections (Home, Dashboard, Login, etc.)
-	- `context/` — React Context (`AppContext.js`)
-	- `hooks/` — custom hooks (`useSocket.js`)
-	- `utils/` — small utilities (`safe.js`)
+- React 18
+- react-scripts (Create React App)
+- axios (HTTP client)
+- socket.io-client (websockets)
+- date-fns (date utilities)
 
-Use these as the starting points when adding features or debugging.
+See `package.json` for exact versions.
 
-**Connecting to the Backend**
+## Project structure (important files)
 
-This frontend expects to talk to a backend API and (optionally) a sockets server. Set `REACT_APP_API_URL` and `REACT_APP_SOCKET_URL` in your `.env` or environment so the axios/socket client code can connect correctly.
+- `public/` — static index.html and manifest
+- `src/` — application source
+  - `App.js` — main app component
+  - `index.js` — React entry point
+  - `components/` — grouped UI components:
+    - `admin/` — admin modals and pages
+    - `common/` — shared components (Header, Footer, Notification, etc.)
+    - `sections/` — page sections (Home, Dashboard, Login, Admin)
+  - `context/` — `AppContext.js` (React Context)
+  - `hooks/` — `useSocket.js` (custom hooks)
+  - `utils/` — `locations.js`, `safe.js` (helpers)
 
-Search for usages of `axios` and `socket.io-client` in `src/` to find where to adapt endpoints.
+## Connecting to the backend
 
-**Deployment notes**
+This frontend expects API and (optionally) socket servers. Configure `REACT_APP_API_URL` and `REACT_APP_SOCKET_URL` accordingly. Search `src/` for `axios` and `socket.io-client` usages to find the connection code.
 
-- The `build/` folder is static and suitable for deployment to any static hosting.
-- If deploying to a host that supports environment variables (Vercel, Netlify, Azure), configure runtime variables there.
-- For single-page-app routing, configure the host to redirect unknown routes to `index.html` (Netlify `_redirects`, Vercel settings, or server rewrite rules).
+## Troubleshooting
 
-**Troubleshooting**
+- Blank page in production: confirm API base URL, CORS settings, and that the build was deployed to the correct directory. Check browser console for errors.
+- Port conflict on :3000: specify a different port: `PORT=3001 npm start` (Unix) or in PowerShell: `$env:PORT=3001; npm start`.
+- Corrupted node_modules/build issues: remove `node_modules` and reinstall:
 
-- If the app shows a blank page after deployment, check that API endpoints are reachable and CORS is allowed.
-- If hot reload doesn't reflect changes, stop and restart the dev server after clearing caches.
-- Use browser DevTools console/network tab to inspect errors and failed network requests.
+```powershell
+rm -r node_modules package-lock.json
+npm install
+```
 
-**Contributing**
+- If caching causes problems: `npm cache clean --force` then reinstall.
 
-- Fork the repo and open a pull request with a clear description of your changes.
-- Keep changes focused and add tests where appropriate.
+## Deployment notes
+
+- `build/` is a static bundle; deploy to static hosting providers (Netlify, Vercel, S3 + CloudFront, Azure Static Web Apps).
+- Configure your host to rewrite unknown routes to `index.html` for client-side routing.
+- Provide runtime environment variables at the host (Netlify/Vercel UI, Azure App Settings).
+
+## Contributing
+
+- Fork the repo, create a feature branch, add tests, and open a pull request with a clear description of changes.
+- Keep changes small and focused. Add or update documentation where appropriate.
+
+## Maintainers / Contact
+
+Repository owner: `umumararungu` (GitHub)
+
+If you need help or want me to add CI, linting, or deployment scripts, tell me which provider (Netlify/Vercel/Azure/Railway) and I can add a basic config.
+
+
 
 
