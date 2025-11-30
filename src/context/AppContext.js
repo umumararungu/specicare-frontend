@@ -142,8 +142,13 @@ export const AppProvider = ({ children }) => {
         axios.get(`${API_BASE}/admin/appointments`),
       ]);
       setAdminStats(statsRes.data?.stats ?? null);
-      setAllUsers(camelizeObject(usersRes.data?.users || []));
-      setAllAppointments(camelizeObject(appointmentsRes.data?.appointments || []));
+      // Support multiple possible API shapes: { users: [...] } or [...] or { data: [...] }
+      const usersPayload = usersRes.data?.users ?? usersRes.data?.data ?? usersRes.data ?? [];
+      setAllUsers(camelizeObject(usersPayload || []));
+
+      // Appointments may come under different keys depending on backend implementation
+      const apptsPayload = appointmentsRes.data?.appointments ?? appointmentsRes.data?.data ?? appointmentsRes.data ?? [];
+      setAllAppointments(camelizeObject(apptsPayload || []));
     } catch (err) {
       console.error("fetchAdminData error", err);
       showNotification("Error loading admin data", "error");
@@ -227,9 +232,16 @@ export const AppProvider = ({ children }) => {
         axios.get(`${API_BASE}/appointments/my`),
       ]);
 
-      setMedicalTests(camelizeObject(testsRes.data || []));
-      setHospitals(camelizeObject(hospitalsRes.data?.hospitals || []));
-      setAppointments(camelizeObject(apptsRes.data || []));
+      // medical tests may be returned as plain array or wrapped object
+      const testsPayload = testsRes.data?.tests ?? testsRes.data?.data ?? testsRes.data ?? [];
+      setMedicalTests(camelizeObject(testsPayload || []));
+
+      const hospitalsPayload = hospitalsRes.data?.hospitals ?? hospitalsRes.data?.data ?? hospitalsRes.data ?? [];
+      setHospitals(camelizeObject(hospitalsPayload || []));
+
+      // appointments/my might return { appointments: [...] } or [...] depending on API
+      const myAppts = apptsRes.data?.appointments ?? apptsRes.data?.data ?? apptsRes.data ?? [];
+      setAppointments(camelizeObject(myAppts || []));
 
       // fetch user's test results as well
       await fetchTestResults();

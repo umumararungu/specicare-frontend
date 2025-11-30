@@ -3,6 +3,7 @@ import { useApp } from "../../context/AppContext";
 import axios from 'axios';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import getTestGuidance from '../../utils/testGuidance';
 
 const BookingModal = () => {
   const { currentTest, confirmBooking, setCurrentTest, currentUser, hospitals } = useApp();
@@ -230,6 +231,21 @@ const BookingModal = () => {
         </span>
         <h2>Book Your Test</h2>
         <form onSubmit={handleSubmit}>
+          {/* Preparation guidance */}
+          {(() => {
+            const guidance = getTestGuidance(currentTest) || [];
+            if (!guidance || guidance.length === 0) return null;
+            return (
+              <div className="preparation-guidance" style={{ border: '1px solid #e1e1e1', background: '#fafafa', padding: '10px', marginBottom: '12px', borderRadius: 6 }}>
+                <strong style={{ display: 'block', marginBottom: 6 }}><i className="fas fa-info-circle" style={{ marginRight: 8 }}></i>Preparation Instructions</strong>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {guidance.map((g, idx) => (
+                    <li key={idx} style={{ marginBottom: 4 }}>{g}</li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })()}
           <div className="form-group">
             <label>Test Type</label>
             <input type="text" value={currentTest.name} readOnly />

@@ -621,8 +621,7 @@ const safeUsers = useMemo(() => allUsers || [], [allUsers]);
                     <button
                       className="secondary-btn"
                       onClick={() => {
-                        // instead of marking completed immediately, open result modal
-                        // and prefill required ids for the result form
+
                         setSelectedAppointment(normalizeAppointment(appointment));
                         setResultModalOpen(true);
                       }}
